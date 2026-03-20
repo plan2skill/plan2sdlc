@@ -7,3 +7,6 @@
 
 export const PLUGIN_NAME = 'claude-sdlc';
 export const PLUGIN_VERSION = '0.1.0';
+
+export * from './types/index.js';
+export * from './utils/index.js';
