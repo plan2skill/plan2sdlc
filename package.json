@@ -1,20 +1,16 @@
 {
   "name": "claude-sdlc",
-  "version": "0.1.9",
+  "version": "0.2.0",
   "description": "Full SDLC governance plugin for Claude Code — orchestrator, agent teams, workflow engine",
   "author": "plan2skill",
   "license": "MIT",
   "type": "module",
-  "bin": {
-    "sdlc-dashboard": "./dashboard/server.cjs"
-  },
   "scripts": {
     "build": "tsc",
     "build:registry": "tsx scripts/registry-builder.ts",
     "lint": "eslint .",
     "test": "vitest run",
-    "test:watch": "vitest",
-    "dashboard": "node dashboard/server.cjs"
+    "test:watch": "vitest"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -28,12 +24,6 @@
     "vitest": "^3.0.0"
   },
   "dependencies": {
-    "chokidar": "^5.0.0",
-    "express": "^5.2.1",
-    "node-pty": "^1.1.0",
-    "ws": "^8.19.0",
-    "xterm": "^5.3.0",
-    "xterm-addon-fit": "^0.8.0",
     "yaml": "^2.8.2"
   }
 }
