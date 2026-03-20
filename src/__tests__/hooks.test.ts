@@ -9,6 +9,7 @@ const HOOKS_DIR = resolve(__dirname, '..', '..', 'hooks');
 const SECRETS_GUARD = resolve(HOOKS_DIR, 'sdlc-secrets-guard.cjs');
 const WRITE_GUARD = resolve(HOOKS_DIR, 'sdlc-write-guard.cjs');
 const ENTRY_CHECK = resolve(HOOKS_DIR, 'entry-check.cjs');
+const SUPERPOWERS_GUARD = resolve(HOOKS_DIR, 'sdlc-superpowers-guard.cjs');
 
 function runHook(
   hookPath: string,
@@ -326,6 +327,76 @@ describe('entry-check', () => {
     const result = await runHook(ENTRY_CHECK, undefined, { CLAUDE_AGENT_NAME: 'orchestrator', SDLC_PROJECT_DIR: tmpDir });
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe('');
+    await fs.promises.rm(tmpDir, { recursive: true });
+  });
+});
+
+describe('sdlc-superpowers-guard', () => {
+  async function makeTmpWithConfig(configContent: string): Promise<string> {
+    const tmpDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'hook-sp-'));
+    await fs.promises.mkdir(path.join(tmpDir, '.sdlc'), { recursive: true });
+    await fs.promises.writeFile(path.join(tmpDir, '.sdlc', 'config.yaml'), configContent);
+    return tmpDir;
+  }
+
+  it('allows non-Skill tools', async () => {
+    const result = await runHook(SUPERPOWERS_GUARD, makeInput('Read', { file_path: 'src/index.ts' }));
+    expect(result.exitCode).toBe(0);
+  });
+
+  it('allows non-superpowers skills', async () => {
+    const input = JSON.stringify({ tool_name: 'Skill', tool_input: { skill: 'claude-sdlc:sdlc-status' } });
+    const result = await runHook(SUPERPOWERS_GUARD, input);
+    expect(result.exitCode).toBe(0);
+  });
+
+  it('allows superpowers when no .sdlc/ config exists', async () => {
+    const tmpDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'hook-sp-'));
+    const input = JSON.stringify({ tool_name: 'Skill', tool_input: { skill: 'superpowers:brainstorming' } });
+    const result = await runHook(SUPERPOWERS_GUARD, input, { cwd: tmpDir });
+    expect(result.exitCode).toBe(0);
+    await fs.promises.rm(tmpDir, { recursive: true });
+  });
+
+  it('blocks superpowers when master toggle is false', async () => {
+    const tmpDir = await makeTmpWithConfig('integrations:\n  superpowers:\n    enabled: false\n');
+    const input = JSON.stringify({ tool_name: 'Skill', tool_input: { skill: 'superpowers:brainstorming' } });
+    const result = await runHook(SUPERPOWERS_GUARD, input, { cwd: tmpDir });
+    expect(result.exitCode).toBe(2);
+    expect(result.stdout).toContain('disabled');
+    await fs.promises.rm(tmpDir, { recursive: true });
+  });
+
+  it('blocks specific superpowers skill when disabled in config', async () => {
+    const tmpDir = await makeTmpWithConfig('integrations:\n  superpowers:\n    enabled: true\n    tdd: false\n');
+    const input = JSON.stringify({ tool_name: 'Skill', tool_input: { skill: 'superpowers:test-driven-development' } });
+    const result = await runHook(SUPERPOWERS_GUARD, input, { cwd: tmpDir });
+    expect(result.exitCode).toBe(2);
+    await fs.promises.rm(tmpDir, { recursive: true });
+  });
+
+  it('allows superpowers skill when enabled in config', async () => {
+    const tmpDir = await makeTmpWithConfig('integrations:\n  superpowers:\n    enabled: true\n    brainstorming: true\n');
+    const input = JSON.stringify({ tool_name: 'Skill', tool_input: { skill: 'superpowers:brainstorming' } });
+    const result = await runHook(SUPERPOWERS_GUARD, input, { cwd: tmpDir });
+    expect(result.exitCode).toBe(0);
+    await fs.promises.rm(tmpDir, { recursive: true });
+  });
+
+  it('blocks using-superpowers auto-invocation when running as orchestrator', async () => {
+    const tmpDir = await makeTmpWithConfig('integrations:\n  superpowers:\n    enabled: true\n');
+    const input = JSON.stringify({ tool_name: 'Skill', tool_input: { skill: 'superpowers:using-superpowers' } });
+    const result = await runHook(SUPERPOWERS_GUARD, input, { CLAUDE_AGENT_NAME: 'orchestrator', cwd: tmpDir });
+    expect(result.exitCode).toBe(2);
+    expect(result.stdout).toContain('orchestrator controls');
+    await fs.promises.rm(tmpDir, { recursive: true });
+  });
+
+  it('always allows utility skills (worktrees, parallel agents)', async () => {
+    const tmpDir = await makeTmpWithConfig('integrations:\n  superpowers:\n    enabled: false\n');
+    const input = JSON.stringify({ tool_name: 'Skill', tool_input: { skill: 'superpowers:using-git-worktrees' } });
+    const result = await runHook(SUPERPOWERS_GUARD, input, { cwd: tmpDir });
+    expect(result.exitCode).toBe(0);
     await fs.promises.rm(tmpDir, { recursive: true });
   });
 });
