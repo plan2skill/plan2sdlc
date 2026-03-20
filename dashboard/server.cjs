@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 // Prevent launching inside Claude Code session
 if (process.env.CLAUDECODE) {
   console.error('Error: Dashboard cannot be launched inside a Claude Code session.');
