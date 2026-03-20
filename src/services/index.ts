@@ -37,3 +37,13 @@ export {
 export {
   detectTechStack,
 } from './tech-stack-detector.js';
+
+export {
+  startSession,
+  recordAgentCost,
+  finalizeSession,
+  loadSessionLogs,
+  generateCostReport,
+  checkBudget,
+  checkMonthlyBudget,
+} from './cost-tracker.js';
