@@ -5,7 +5,7 @@
 Install the plugin into your Claude Code project:
 
 ```bash
-claude plugin add plan2skill/claude-sdlc
+claude plugin add plan2skill/plan2sdlc
 ```
 
 This adds the plugin to your project. No source files are modified until you run `/sdlc init`.
