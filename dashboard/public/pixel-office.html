@@ -5,164 +5,211 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Pixel Agents</title>
     <link rel="stylesheet" crossorigin href="./pixel-assets/index-8M7aiFDb.css">
-    <style>
-      html, body, #root { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
-    </style>
+    <style>html, body, #root { margin:0; padding:0; width:100%; height:100%; overflow:hidden; }</style>
     <script>
       // Mock VS Code API
       window.acquireVsCodeApi = function() {
         const state = {};
         return {
           postMessage: function(msg) {
-            if (msg.type === 'webviewReady') {
-              // Pixel-agents signals it's ready — send all init data
-              setTimeout(initPixelAgents, 100);
-            }
+            if (msg.type === 'webviewReady') setTimeout(initPixelAgents, 200);
             window.parent.postMessage({ source: 'pixel-agents', payload: msg }, '*');
           },
           getState: function() { return state; },
-          setState: function(newState) { Object.assign(state, newState); },
+          setState: function(s) { Object.assign(state, s); },
         };
       };
 
-      // Load an image as ImageBitmap
-      async function loadImage(url) {
-        const response = await fetch(url);
-        const blob = await response.blob();
-        return await createImageBitmap(blob);
+      // Convert hex color to string like extension does
+      function toHex(r,g,b,a) {
+        if (a < 2) return '';
+        const hex = '#' + r.toString(16).padStart(2,'0') + g.toString(16).padStart(2,'0') + b.toString(16).padStart(2,'0');
+        return a >= 255 ? hex.toUpperCase() : (hex + a.toString(16).padStart(2,'0')).toUpperCase();
       }
 
-      // Load all furniture from manifests
+      // Read PNG via canvas → 2D hex array (same format as extension's pngjs approach)
+      async function pngToPixels(url, w, h) {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        await new Promise((ok, fail) => { img.onload = ok; img.onerror = fail; img.src = url; });
+        const c = document.createElement('canvas');
+        c.width = w || img.width; c.height = h || img.height;
+        const ctx = c.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        const data = ctx.getImageData(0, 0, c.width, c.height).data;
+        const rows = [];
+        for (let y = 0; y < c.height; y++) {
+          const row = [];
+          for (let x = 0; x < c.width; x++) {
+            const i = (y * c.width + x) * 4;
+            row.push(toHex(data[i], data[i+1], data[i+2], data[i+3]));
+          }
+          rows.push(row);
+        }
+        return rows;
+      }
+
+      // Character sprites: 16x32 frames, 7 frames per row, 3 directions (down/up/right)
+      const CHAR_DIRS = ['down', 'up', 'right'];
+      async function loadCharacterSprites() {
+        const characters = [];
+        for (let i = 0; i < 6; i++) {
+          try {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            await new Promise((ok, fail) => { img.onload = ok; img.onerror = fail; img.src = `./pixel-assets/characters/char_${i}.png`; });
+            const c = document.createElement('canvas');
+            c.width = img.width; c.height = img.height;
+            const ctx = c.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+            const pxData = ctx.getImageData(0, 0, c.width, c.height).data;
+            const dirs = { down: [], up: [], right: [] };
+            for (let d = 0; d < 3; d++) {
+              const baseY = d * 32;
+              const frames = [];
+              for (let f = 0; f < 7; f++) {
+                const baseX = f * 16;
+                const frame = [];
+                for (let y = 0; y < 32; y++) {
+                  const row = [];
+                  for (let x = 0; x < 16; x++) {
+                    const idx = ((baseY + y) * c.width + (baseX + x)) * 4;
+                    row.push(toHex(pxData[idx], pxData[idx+1], pxData[idx+2], pxData[idx+3]));
+                  }
+                  frame.push(row);
+                }
+                frames.push(frame);
+              }
+              dirs[CHAR_DIRS[d]] = frames;
+            }
+            characters.push(dirs);
+          } catch(e) { console.warn('Failed to load char_' + i, e); }
+        }
+        return characters;
+      }
+
+      // Floor tiles: 16x16 each
+      async function loadFloorTiles() {
+        const sprites = [];
+        for (let i = 0; i < 9; i++) {
+          try { sprites.push(await pngToPixels(`./pixel-assets/floors/floor_${i}.png`, 16, 16)); }
+          catch(e) {}
+        }
+        return sprites;
+      }
+
+      // Wall tiles: 64x128 spritesheet → 16 pieces (4x4 grid of 16x32 each)
+      async function loadWallTiles() {
+        const sets = [];
+        try {
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          await new Promise((ok, fail) => { img.onload = ok; img.onerror = fail; img.src = './pixel-assets/walls/wall_0.png'; });
+          const c = document.createElement('canvas');
+          c.width = img.width; c.height = img.height;
+          const ctx = c.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+          const pxData = ctx.getImageData(0, 0, c.width, c.height).data;
+          const pieces = [];
+          for (let n = 0; n < 16; n++) {
+            const bx = (n % 4) * 16, by = Math.floor(n / 4) * 32;
+            const piece = [];
+            for (let y = 0; y < 32; y++) {
+              const row = [];
+              for (let x = 0; x < 16; x++) {
+                const idx = ((by + y) * c.width + (bx + x)) * 4;
+                row.push(toHex(pxData[idx], pxData[idx+1], pxData[idx+2], pxData[idx+3]));
+              }
+              piece.push(row);
+            }
+            pieces.push(piece);
+          }
+          sets.push(pieces);
+        } catch(e) { console.warn('Failed to load wall tiles', e); }
+        return sets;
+      }
+
+      // Furniture: load manifests + sprites as pixel arrays
       async function loadFurniture() {
-        const furnitureTypes = [
-          'BIN','BOOKSHELF','CACTUS','CLOCK','COFFEE','COFFEE_TABLE',
-          'CUSHIONED_BENCH','CUSHIONED_CHAIR','DESK','DOUBLE_BOOKSHELF',
-          'HANGING_PLANT','LARGE_PAINTING','LARGE_PLANT','PC','PLANT',
-          'PLANT_2','POT','SMALL_PAINTING','SMALL_PAINTING_2','SMALL_TABLE',
-          'SOFA','TABLE_FRONT','WHITEBOARD','WOODEN_BENCH','WOODEN_CHAIR'
-        ];
+        const TYPES = ['BIN','BOOKSHELF','CACTUS','CLOCK','COFFEE','COFFEE_TABLE','CUSHIONED_BENCH','CUSHIONED_CHAIR','DESK','DOUBLE_BOOKSHELF','HANGING_PLANT','LARGE_PAINTING','LARGE_PLANT','PC','PLANT','PLANT_2','POT','SMALL_PAINTING','SMALL_PAINTING_2','SMALL_TABLE','SOFA','TABLE_FRONT','WHITEBOARD','WOODEN_BENCH','WOODEN_CHAIR'];
         const catalog = [];
         const sprites = {};
-        for (const type of furnitureTypes) {
+        for (const type of TYPES) {
           try {
             const resp = await fetch(`./pixel-assets/furniture/${type}/manifest.json`);
             const manifest = await resp.json();
-            catalog.push({ type, manifest });
-            // Load sprite images referenced in manifest
-            const typeSprites = {};
-            for (const variant of Object.keys(manifest.variants || {})) {
-              const img = manifest.variants[variant];
-              if (img && img.file) {
-                typeSprites[variant] = await loadImage(`./pixel-assets/furniture/${type}/${img.file}`);
+            const ctx = { groupId: manifest.id, name: manifest.name, category: manifest.category, canPlaceOnWalls: manifest.canPlaceOnWalls, canPlaceOnSurfaces: manifest.canPlaceOnSurfaces, backgroundTiles: manifest.backgroundTiles };
+            let items = [];
+            if (manifest.type === 'asset') {
+              items = [{ id: manifest.id, name: manifest.name, label: manifest.name, category: manifest.category, file: manifest.file || `${manifest.id}.png`, width: manifest.width, height: manifest.height, footprintW: manifest.footprintW, footprintH: manifest.footprintH, isDesk: manifest.category === 'desks', canPlaceOnWalls: manifest.canPlaceOnWalls, canPlaceOnSurfaces: manifest.canPlaceOnSurfaces, backgroundTiles: manifest.backgroundTiles, groupId: manifest.id }];
+            } else if (manifest.members) {
+              for (const m of manifest.members) {
+                if (m.type === 'asset') {
+                  items.push({ id: m.id, name: manifest.name, label: manifest.name, category: manifest.category, file: m.file, width: m.width, height: m.height, footprintW: m.footprintW, footprintH: m.footprintH, isDesk: manifest.category === 'desks', canPlaceOnWalls: manifest.canPlaceOnWalls, canPlaceOnSurfaces: manifest.canPlaceOnSurfaces, backgroundTiles: manifest.backgroundTiles, groupId: manifest.id, ...(m.orientation ? { orientation: m.orientation } : {}), ...(manifest.rotationScheme ? { rotationScheme: manifest.rotationScheme } : {}) });
+                }
               }
             }
-            // Also load default sprite
-            if (manifest.file) {
-              typeSprites['default'] = await loadImage(`./pixel-assets/furniture/${type}/${manifest.file}`);
+            for (const item of items) {
+              try {
+                const px = await pngToPixels(`./pixel-assets/furniture/${type}/${item.file}`, item.width, item.height);
+                sprites[item.id] = px;
+              } catch(e) {}
             }
-            // Load all PNGs in the type directory
-            for (const key of Object.keys(manifest)) {
-              if (typeof manifest[key] === 'string' && manifest[key].endsWith('.png')) {
-                const spriteName = key;
-                typeSprites[spriteName] = await loadImage(`./pixel-assets/furniture/${type}/${manifest[key]}`);
-              }
-            }
-            sprites[type] = typeSprites;
-          } catch(e) {
-            // Skip furniture that fails to load
-          }
+            catalog.push(...items);
+          } catch(e) {}
         }
         return { catalog, sprites };
       }
 
       async function initPixelAgents() {
         try {
-          // 1. Load character sprites (6 characters)
-          const characters = [];
-          for (let i = 0; i < 6; i++) {
-            try {
-              const bmp = await loadImage(`./pixel-assets/characters/char_${i}.png`);
-              characters.push(bmp);
-            } catch(e) {}
-          }
+          console.log('[pixel-office] Loading assets...');
+          const [characters, floors, wallSets, furniture] = await Promise.all([
+            loadCharacterSprites(),
+            loadFloorTiles(),
+            loadWallTiles(),
+            loadFurniture(),
+          ]);
+          console.log(`[pixel-office] Loaded: ${characters.length} chars, ${floors.length} floors, ${wallSets.length} wall sets, ${furniture.catalog.length} furniture`);
+
           window.postMessage({ type: 'characterSpritesLoaded', characters }, '*');
-
-          // 2. Load floor tiles (9 types)
-          const floors = [];
-          for (let i = 0; i < 9; i++) {
-            try {
-              const bmp = await loadImage(`./pixel-assets/floors/floor_${i}.png`);
-              floors.push(bmp);
-            } catch(e) {}
-          }
           window.postMessage({ type: 'floorTilesLoaded', sprites: floors }, '*');
+          window.postMessage({ type: 'wallTilesLoaded', sets: wallSets }, '*');
+          window.postMessage({ type: 'furnitureAssetsLoaded', catalog: furniture.catalog, sprites: furniture.sprites }, '*');
 
-          // 3. Load wall tiles
-          const walls = [];
-          try {
-            const bmp = await loadImage(`./pixel-assets/walls/wall_0.png`);
-            walls.push(bmp);
-          } catch(e) {}
-          window.postMessage({ type: 'wallTilesLoaded', sets: walls }, '*');
-
-          // 4. Load furniture
-          const { catalog, sprites } = await loadFurniture();
-          window.postMessage({ type: 'furnitureAssetsLoaded', catalog, sprites }, '*');
-
-          // 5. Load layout
           const layoutResp = await fetch('./pixel-assets/default-layout-1.json');
           const layout = await layoutResp.json();
-          window.postMessage({ type: 'layoutLoaded', layout }, '*');
-
-          // 6. Settings
+          window.postMessage({ type: 'layoutLoaded', layout, wasReset: false }, '*');
           window.postMessage({ type: 'settingsLoaded', soundEnabled: false }, '*');
-
-          // 7. Workspace
-          window.postMessage({ type: 'workspaceFolders', folders: [{ name: 'project', uri: '/' }] }, '*');
-
-          // 8. Create orchestrator agent
+          window.postMessage({ type: 'workspaceFolders', folders: [{ name: 'project', path: '/' }] }, '*');
           window.postMessage({ type: 'existingAgents', agents: [1], agentMeta: {}, folderNames: { 1: 'orchestrator' } }, '*');
 
-          console.log('[pixel-office] Init complete: characters=' + characters.length + ' floors=' + floors.length + ' furniture=' + catalog.length);
-        } catch(e) {
-          console.error('[pixel-office] Init failed:', e);
-        }
+          console.log('[pixel-office] Init complete!');
+        } catch(e) { console.error('[pixel-office] Init failed:', e); }
       }
 
-      // Listen for messages from parent
+      // Listen for agent events from parent dashboard
       window.addEventListener('message', function(event) {
         if (event.data && event.data.source === 'sdlc-dashboard') {
           const p = event.data.payload;
-          if (p.action === 'createAgent') {
-            const id = Object.keys(window._agentMap || {}).length + 2;
-            window._agentMap = window._agentMap || {};
-            window._agentMap[p.name] = id;
-            window.postMessage({ type: 'agentCreated', id, folderName: p.name }, '*');
-          }
-          else if (p.action === 'activateAgent') {
-            window._agentMap = window._agentMap || {};
+          window._agentMap = window._agentMap || { orchestrator: 1 };
+          if (p.action === 'activateAgent' || p.action === 'createAgent') {
             let id = window._agentMap[p.name];
             if (!id) {
-              id = Object.keys(window._agentMap).length + 2;
+              id = Object.keys(window._agentMap).length + 1;
               window._agentMap[p.name] = id;
               window.postMessage({ type: 'agentCreated', id, folderName: p.name }, '*');
             }
-            window.postMessage({ type: 'agentSelected', id }, '*');
-            window.postMessage({ type: 'agentToolStart', id, toolId: 'tool-' + Date.now(), status: p.tool || 'Working...' }, '*');
-          }
-          else if (p.action === 'stateUpdate') {
-            window._agentMap = window._agentMap || {};
+            if (p.action === 'activateAgent') {
+              window.postMessage({ type: 'agentSelected', id }, '*');
+              window.postMessage({ type: 'agentToolStart', id, toolId: 'tool-' + Date.now(), status: p.tool || 'Working...' }, '*');
+            }
+          } else if (p.action === 'stateUpdate') {
             for (const name of (p.agents || [])) {
               if (!window._agentMap[name]) {
-                const id = Object.keys(window._agentMap).length + 2;
+                const id = Object.keys(window._agentMap).length + 1;
                 window._agentMap[name] = id;
                 window.postMessage({ type: 'agentCreated', id, folderName: name }, '*');
-              }
-            }
-            for (const a of (p.activeAgents || [])) {
-              const id = window._agentMap[a.name];
-              if (id) {
-                window.postMessage({ type: 'agentToolStart', id, toolId: 'tool-' + Date.now(), status: a.tool || 'Working...' }, '*');
               }
             }
           }
