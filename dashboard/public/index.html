@@ -227,36 +227,78 @@
     connectTerminal();
 
     // ===== Terminal → Pixel Office Bridge =====
-    // Parse Claude output for agent activity keywords and forward to pixel office
     let termBuffer = '';
-    function forwardToPixelOffice(data) {
-      termBuffer += data;
-      // Check for session/agent activity patterns in output
+    function sendToPixel(action, data) {
       const iframe = document.getElementById('pixel-office');
       if (!iframe || !iframe.contentWindow) return;
+      iframe.contentWindow.postMessage({
+        source: 'sdlc-dashboard',
+        payload: { action, ...data },
+      }, '*');
+    }
 
-      const patterns = [
-        { re: /EXECUTE/i, event: 'toolStart', tool: 'EXECUTE' },
-        { re: /REVIEW/i, event: 'toolStart', tool: 'REVIEW' },
-        { re: /BRAINSTORM/i, event: 'toolStart', tool: 'BRAINSTORM' },
-        { re: /PLAN/i, event: 'toolStart', tool: 'PLAN' },
-        { re: /MERGE/i, event: 'toolStart', tool: 'MERGE' },
-        { re: /QUICK_FIX/i, event: 'toolStart', tool: 'QUICK_FIX' },
-        { re: /completed|done|approved/i, event: 'toolComplete', tool: 'session' },
-        { re: /developer|tester|architect|reviewer/i, event: 'agentSelected', tool: 'agent' },
+    function forwardToPixelOffice(data) {
+      termBuffer += data;
+
+      // Detect agent mentions → create + activate in pixel office
+      const agentPatterns = [
+        { re: /orchestrator/i, name: 'orchestrator', tool: 'Orchestrating' },
+        { re: /(\w+)-developer/i, tool: 'Coding' },
+        { re: /(\w+)-tester/i, tool: 'Testing' },
+        { re: /architect/i, name: 'architect', tool: 'Designing' },
+        { re: /reviewer/i, name: 'reviewer', tool: 'Reviewing' },
+        { re: /qa-lead/i, name: 'qa-lead', tool: 'QA' },
       ];
 
-      for (const p of patterns) {
-        if (p.re.test(termBuffer)) {
-          iframe.contentWindow.postMessage({
-            source: 'sdlc-dashboard',
-            payload: { type: p.event, toolName: p.tool, agentId: 'orchestrator' }
-          }, '*');
+      for (const p of agentPatterns) {
+        const match = termBuffer.match(p.re);
+        if (match) {
+          const name = p.name || match[0].toLowerCase();
+          sendToPixel('activateAgent', { name, tool: p.tool });
         }
+      }
+
+      // Detect session transitions
+      const sessions = ['EXECUTE', 'REVIEW', 'BRAINSTORM', 'PLAN', 'MERGE', 'QUICK_FIX', 'HOTFIX', 'TRIAGE'];
+      for (const s of sessions) {
+        if (termBuffer.includes(s)) {
+          sendToPixel('activateAgent', { name: 'orchestrator', tool: s });
+        }
+      }
+
+      // Detect completion
+      if (/✅|completed|done|approved|merged/i.test(termBuffer)) {
+        sendToPixel('idleAgent', { name: 'orchestrator' });
+      }
+
+      // Detect HITL waiting
+      if (/\[y\/n\]|Continue\?|Proceed\?|approve/i.test(termBuffer)) {
+        sendToPixel('waitingAgent', { name: 'orchestrator' });
       }
 
       // Keep buffer manageable
       if (termBuffer.length > 2000) termBuffer = termBuffer.slice(-1000);
+    }
+
+    // Also forward state updates to pixel office when .sdlc/ changes
+    function syncAgentsToPixel(state) {
+      const registryAgents = parseRegistry(state.registry);
+      const workflows = state.workflow?.activeWorkflows || [];
+      const agentNames = registryAgents.map(a => a.name);
+      const activeAgents = [];
+
+      if (workflows.length > 0) {
+        activeAgents.push({ name: 'orchestrator', tool: workflows[0].currentSession || 'Working' });
+        for (const wf of workflows) {
+          if (wf.domains) {
+            for (const d of wf.domains) {
+              activeAgents.push({ name: d + '-developer', tool: wf.currentSession });
+            }
+          }
+        }
+      }
+
+      sendToPixel('stateUpdate', { agents: agentNames, activeAgents });
     }
 
     // ===== State Updates =====
@@ -356,6 +398,9 @@
       const registryAgents = parseRegistry(state.registry);
       updateAgentGrid(workflows, items, registryAgents);
       updateProgressBar(workflows, items);
+
+      // Sync agents to pixel office iframe
+      syncAgentsToPixel(state);
     }
 
     function updateAgentGrid(workflows, items, registryAgents) {
