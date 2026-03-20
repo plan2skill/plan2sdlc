@@ -5,6 +5,22 @@ All notable changes to the claude-sdlc plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-03-21
+
+### Added
+- SessionStart state injection — orchestrator receives SDLC context on startup (entry-check.cjs v2)
+- Subagent dispatch template with TDD discipline, status protocol, self-review checklist
+- Config schema v2 — execution settings (maxIterations, maxRetries), sharedPaths, generatedPaths
+- RETRO v2 — quality rubric scoring (6 criteria, A-F grades per agent)
+- v2 attribution for 5 adapted open-source patterns (THIRD_PARTY_NOTICES.md)
+
+### Changed
+- Superpowers guard simplified to block-all when SDLC active (165 → 34 lines)
+- Config schema version bumped to 2
+
+### Verified
+- disallowedTools correctly wired in both domain-developer and domain-tester templates
+
 ## [0.1.1] - 2026-03-20
 
 ### Fixed

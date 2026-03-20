@@ -154,10 +154,25 @@ export async function generateConfig(
     await writeFile(configPath, templateContent, 'utf-8');
   } else {
     // Fallback: write a minimal config
+    const domainEntries: Record<string, Record<string, unknown>> = {};
+    for (const d of initResult.domains.domains) {
+      domainEntries[d.name] = {
+        path: d.path,
+        techStack: d.techStack,
+        sharedPaths: [],
+        generatedPaths: [],
+      };
+    }
     await writeYamlFile(configPath, {
+      schemaVersion: 2,
       project: {
         type: initResult.profile.projectType,
         techStack: initResult.profile.frameworks,
+      },
+      domains: domainEntries,
+      execution: {
+        maxIterations: 5,
+        maxRetries: 3,
       },
     });
   }
