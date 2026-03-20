@@ -228,6 +228,10 @@
 
     // ===== Terminal → Pixel Office Bridge =====
     let termBuffer = '';
+    // Strip ANSI escape codes for pattern matching
+    function stripAnsi(str) {
+      return str.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '').replace(/\x1b\][^\x07]*\x07/g, '');
+    }
     function sendToPixel(action, data) {
       const iframe = document.getElementById('pixel-office');
       if (!iframe || !iframe.contentWindow) return;
@@ -238,7 +242,7 @@
     }
 
     function forwardToPixelOffice(data) {
-      termBuffer += data;
+      termBuffer += stripAnsi(data);
 
       // Detect agent mentions → create + activate in pixel office
       const agentPatterns = [
