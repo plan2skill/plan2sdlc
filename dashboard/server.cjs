@@ -51,6 +51,11 @@ app.get('/api/state', (req, res) => {
     if (fs.existsSync(statePath)) {
       state.workflow = JSON.parse(fs.readFileSync(statePath, 'utf8'));
     }
+    // Read registry for agent list
+    const registryPath = path.join(SDLC_DIR, 'registry.yaml');
+    if (fs.existsSync(registryPath)) {
+      state.registry = fs.readFileSync(registryPath, 'utf8');
+    }
     state.initialized = fs.existsSync(configPath);
 
     res.json(state);
@@ -145,6 +150,10 @@ function broadcastState() {
     }
     if (fs.existsSync(statePath)) {
       state.workflow = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+    }
+    const registryPath = path.join(SDLC_DIR, 'registry.yaml');
+    if (fs.existsSync(registryPath)) {
+      state.registry = fs.readFileSync(registryPath, 'utf8');
     }
 
     const msg = JSON.stringify({ type: 'state', data: state });

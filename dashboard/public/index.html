@@ -259,8 +259,31 @@
       .then(updateDashboard)
       .catch(() => {});
 
+    // Parse simple YAML registry (extract agent names)
+    function parseRegistry(yamlStr) {
+      if (!yamlStr) return [];
+      const agents = [];
+      const lines = yamlStr.split('\n');
+      let currentAgent = null;
+      for (const line of lines) {
+        const nameMatch = line.match(/^\s*-?\s*name:\s*(.+)/);
+        if (nameMatch) {
+          currentAgent = { name: nameMatch[1].trim().replace(/['"]/g, '') };
+          agents.push(currentAgent);
+        }
+        if (currentAgent) {
+          const catMatch = line.match(/^\s*category:\s*(.+)/);
+          if (catMatch) currentAgent.category = catMatch[1].trim().replace(/['"]/g, '');
+          const statusMatch = line.match(/^\s*status:\s*(.+)/);
+          if (statusMatch) currentAgent.status = statusMatch[1].trim().replace(/['"]/g, '');
+          const tierMatch = line.match(/^\s*tier:\s*(.+)/);
+          if (tierMatch) currentAgent.tier = tierMatch[1].trim().replace(/['"]/g, '');
+        }
+      }
+      return agents;
+    }
+
     function updateDashboard(state) {
-      // Update stats
       const backlog = state.backlog;
       const items = Array.isArray(backlog) ? backlog : (backlog?.items || []);
       const activeItems = items.filter(i => !['done', 'abandoned'].includes(i.status));
@@ -272,90 +295,116 @@
       const totalCost = items.reduce((sum, i) => sum + (i.actualCost || 0), 0);
       document.getElementById('stat-cost').textContent = '$' + totalCost.toFixed(2);
 
-      // Update agent grid
-      updateAgentGrid(workflows, items);
-
-      // Update progress bar
+      const registryAgents = parseRegistry(state.registry);
+      updateAgentGrid(workflows, items, registryAgents);
       updateProgressBar(workflows, items);
     }
 
-    function updateAgentGrid(workflows, items) {
+    function updateAgentGrid(workflows, items, registryAgents) {
       const grid = document.getElementById('agent-grid');
       if (!grid) return;
 
-      // Collect agents from active workflows
-      const agents = new Set();
-      if (workflows.length > 0) {
-        // Show workflow-related agents
-        for (const wf of workflows) {
-          agents.add('orchestrator');
-          if (wf.domains) {
-            for (const d of wf.domains) {
-              agents.add(d + '-developer');
-              agents.add(d + '-tester');
-            }
+      // Use registry agents if available, otherwise defaults
+      let agents = registryAgents.length > 0
+        ? registryAgents.filter(a => a.status !== 'disabled')
+        : [
+            { name: 'orchestrator', category: 'governance' },
+            { name: 'architect', category: 'governance' },
+            { name: 'reviewer', category: 'governance' },
+          ];
+
+      // Determine which agents are active in current workflows
+      const activeAgentNames = new Set();
+      for (const wf of workflows) {
+        activeAgentNames.add('orchestrator');
+        if (wf.domains) {
+          for (const d of wf.domains) {
+            activeAgentNames.add(d + '-developer');
+            activeAgentNames.add(d + '-tester');
           }
         }
+        // Add session-specific agents
+        const session = wf.currentSession || '';
+        if (session === 'REVIEW') activeAgentNames.add('governance-reviewer');
+        if (session === 'BRAINSTORM') activeAgentNames.add('governance-architect');
+        if (session === 'PLAN') activeAgentNames.add('governance-architect');
       }
 
-      if (agents.size === 0) {
-        // Default agents
-        ['orchestrator', 'architect', 'reviewer', 'developer', 'tester'].forEach(a => agents.add(a));
-      }
-
-      const icons = {
-        orchestrator: '[O]', architect: '[A]', reviewer: '[R]',
-        developer: '[D]', tester: '[T]', default: '[?]'
+      const categoryColors = {
+        governance: '#58a6ff', development: '#3fb950', testing: '#d29922',
+        design: '#bc8cff', product: '#f778ba', specialist: '#39d353',
+        consultant: '#8b949e', business: '#f0883e', bridge: '#484f58',
       };
 
-      grid.innerHTML = [...agents].map(name => {
-        const icon = Object.entries(icons).find(([k]) => name.includes(k))?.[1] || icons.default;
-        const isActive = workflows.some(wf => wf.currentSession === 'EXECUTE');
+      const categoryIcons = {
+        governance: '👔', development: '🧑‍💻', testing: '🧪',
+        design: '🎨', product: '📊', specialist: '🔧',
+        consultant: '🎓', business: '📈', bridge: '🔗',
+      };
+
+      grid.innerHTML = agents.slice(0, 20).map(agent => {
+        const cat = agent.category || 'governance';
+        const color = categoryColors[cat] || '#8b949e';
+        const icon = categoryIcons[cat] || '🤖';
+        const isActive = activeAgentNames.has(agent.name) || workflows.length > 0 && agent.name === 'orchestrator';
+        const borderColor = isActive ? color : '#30363d';
+        const opacity = isActive ? '1' : '0.5';
+
         return `<div style="
-          background:#1c2128; border:1px solid #30363d; border-radius:8px;
-          padding:8px 12px; text-align:center; min-width:80px; cursor:pointer;
-          ${isActive ? 'border-color:#58a6ff;' : ''}
-        " onclick="showAgentPopup(event, '${name}')">
-          <div style="font-size:20px; font-family:monospace; color:#58a6ff;">${icon}</div>
-          <div style="font-size:10px; color:#8b949e; margin-top:2px;">${name}</div>
+          background:#1c2128; border:2px solid ${borderColor}; border-radius:8px;
+          padding:8px 12px; text-align:center; min-width:90px; cursor:pointer;
+          opacity:${opacity}; transition: all 0.3s;
+        " onclick="showAgentPopup(event, '${agent.name}', '${cat}', ${isActive})">
+          <div style="font-size:20px;">${icon}</div>
+          <div style="font-size:10px; color:${color}; margin-top:2px; font-weight:${isActive ? '600' : '400'};">${agent.name}</div>
+          ${isActive ? '<div style="font-size:8px; color:#3fb950; margin-top:2px;">● active</div>' : ''}
         </div>`;
       }).join('');
+
+      // Hide placeholder text if we have agents
+      const placeholder = document.getElementById('office-placeholder');
+      if (placeholder) {
+        const h2 = placeholder.querySelector('h2');
+        const ps = placeholder.querySelectorAll('p');
+        if (h2) h2.textContent = workflows.length > 0 ? '🏢 Agent Team' : '🏢 Pixel Office';
+        if (ps[0]) ps[0].textContent = workflows.length > 0 ? `${activeAgentNames.size} agents active` : `${agents.length} agents registered`;
+        if (ps[1]) ps[1].textContent = workflows.length > 0 ? '' : 'Dispatch a task to see agents in action';
+      }
     }
 
     function updateProgressBar(workflows, items) {
       const bar = document.getElementById('progress-bar');
       if (workflows.length === 0) {
-        bar.innerHTML = '<span style="color:#8b949e;">No active workflow</span>';
+        bar.innerHTML = '<span style="color:#8b949e;">No active workflow — describe a task in the terminal to start</span>';
         return;
       }
 
       const wf = workflows[0];
-      const chain = wf.sessionChain || ['EXECUTE'];
+      const chain = wf.sessionChain || [wf.currentSession || 'EXECUTE'];
       const current = wf.currentSession || chain[0];
       const currentIdx = chain.indexOf(current);
 
-      // Find backlog item
       const task = items.find(i => i.id === wf.backlogItemId);
-      const taskLabel = task ? `${task.id}: ${task.title}` : wf.backlogItemId;
+      const taskLabel = task ? `${task.id}: ${task.title}` : wf.backlogItemId || 'workflow';
 
-      bar.innerHTML = `<span style="color:#58a6ff; font-weight:600; margin-right:12px;">${taskLabel}</span>` +
+      bar.innerHTML = `<span style="color:#58a6ff; font-weight:600; margin-right:12px;">📋 ${taskLabel}</span>` +
         chain.map((step, i) => {
           let cls = 'pending';
-          let icon = '[ ]';
-          if (i < currentIdx) { cls = 'done'; icon = '[x]'; }
-          else if (i === currentIdx) { cls = 'active'; icon = '[>]'; }
+          let icon = '⬚';
+          if (i < currentIdx) { cls = 'done'; icon = '✅'; }
+          else if (i === currentIdx) { cls = 'active'; icon = '▶'; }
           return `<span class="progress-step ${cls}">${icon} ${step}</span>` +
-            (i < chain.length - 1 ? '<span class="progress-arrow">-></span>' : '');
+            (i < chain.length - 1 ? '<span class="progress-arrow">→</span>' : '');
         }).join('');
     }
 
-    function showAgentPopup(event, name) {
+    function showAgentPopup(event, name, category, isActive) {
       const popup = document.getElementById('agent-popup');
       document.getElementById('popup-name').textContent = name;
-      document.getElementById('popup-role').textContent = name.includes('developer') ? 'Developer' :
-        name.includes('tester') ? 'Tester' : name.includes('architect') ? 'Architect' :
-        name.includes('reviewer') ? 'Reviewer' : name === 'orchestrator' ? 'Orchestrator' : 'Agent';
-      document.getElementById('popup-status').innerHTML = '<span style="color:#3fb950;">&#9679;</span> Active';
+      document.getElementById('popup-role').textContent = (category || 'agent').charAt(0).toUpperCase() + (category || 'agent').slice(1);
+      document.getElementById('popup-status').innerHTML = isActive
+        ? '<span style="color:#3fb950;">● Active</span>'
+        : '<span style="color:#8b949e;">○ Idle</span>';
       popup.style.left = event.clientX + 'px';
       popup.style.top = event.clientY + 'px';
       popup.classList.add('visible');
