@@ -9,11 +9,11 @@
   "license": "MIT",
   "homepage": "https://github.com/plan2skill/plan2sdlc",
   "repository": "https://github.com/plan2skill/plan2sdlc",
-  "claude-code-min-version": "1.0.0",
-  "experimental": true,
   "keywords": ["sdlc", "governance", "workflow", "agents", "orchestrator"],
   "skills": "./skills/",
-  "agents": "./agents/",
+  "agents": [
+    "./agents/orchestrator.md"
+  ],
   "hooks": {
     "SessionStart": [
       {
