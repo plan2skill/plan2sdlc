@@ -65,3 +65,17 @@ export type {
   TechDebtStatus,
   TechDebtTrend,
 } from './tech-debt.js';
+
+export type {
+  ProjectProfile,
+  DomainMap,
+  DomainEntry,
+} from './detection.js';
+
+export { DEFAULT_ENV_CONFIG } from './environment.js';
+export type {
+  Environment,
+  EnvironmentPermissions,
+  EnvironmentInfo,
+  EnvironmentConfig,
+} from './environment.js';
