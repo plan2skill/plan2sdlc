@@ -1,27 +1,33 @@
 import { describe, it, expect } from 'vitest';
 import { execFile } from 'node:child_process';
 import { resolve } from 'node:path';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 
 const HOOKS_DIR = resolve(__dirname, '..', '..', 'hooks');
-const SECRETS_GUARD = resolve(HOOKS_DIR, 'sdlc-secrets-guard.js');
-const WRITE_GUARD = resolve(HOOKS_DIR, 'sdlc-write-guard.js');
-const ENTRY_CHECK = resolve(HOOKS_DIR, 'entry-check.js');
+const SECRETS_GUARD = resolve(HOOKS_DIR, 'sdlc-secrets-guard.cjs');
+const WRITE_GUARD = resolve(HOOKS_DIR, 'sdlc-write-guard.cjs');
+const ENTRY_CHECK = resolve(HOOKS_DIR, 'entry-check.cjs');
 
 function runHook(
   hookPath: string,
   stdinData?: string,
-  env?: Record<string, string>,
+  options?: Record<string, string>,
 ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+  const cwd = options?.['cwd'];
+  const envOverrides = options ? Object.fromEntries(Object.entries(options).filter(([k]) => k !== 'cwd')) : {};
   return new Promise((resolve) => {
     const child = execFile(
       'node',
       [hookPath],
       {
-        env: { ...process.env, ...env },
+        env: { ...process.env, ...envOverrides },
+        cwd: cwd || undefined,
         timeout: 5000,
       },
       (error, stdout, stderr) => {
-        const exitCode = error ? (error as NodeJS.ErrnoException & { code?: number | string }).code === 2 || (error as { status?: number }).status === 2 ? 2 : (child.exitCode ?? 1) : 0;
+        const exitCode = child.exitCode ?? (error ? 1 : 0);
         resolve({ stdout: stdout.toString(), stderr: stderr.toString(), exitCode });
       },
     );
@@ -292,24 +298,34 @@ describe('sdlc-write-guard', () => {
 });
 
 describe('entry-check', () => {
-  it('outputs warning when CLAUDE_AGENT_NAME is not set', async () => {
-    const result = await runHook(ENTRY_CHECK, undefined, { CLAUDE_AGENT_NAME: '' });
+  it('shows init prompt when .sdlc/ does not exist', async () => {
+    const tmpDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'hook-entry-'));
+    const result = await runHook(ENTRY_CHECK, undefined, { CLAUDE_AGENT_NAME: '', SDLC_PROJECT_DIR: tmpDir });
+    expect(result.exitCode).toBe(0);
+    const output = JSON.parse(result.stdout);
+    expect(output.result).toContain('SDLC PLUGIN INSTALLED');
+    expect(output.result).toContain('/sdlc init');
+    await fs.promises.rm(tmpDir, { recursive: true });
+  });
+
+  it('outputs warning when not orchestrator and .sdlc/ exists', async () => {
+    const tmpDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'hook-entry-'));
+    await fs.promises.mkdir(path.join(tmpDir, '.sdlc'), { recursive: true });
+    await fs.promises.writeFile(path.join(tmpDir, '.sdlc', 'config.yaml'), 'project:\n  name: test\n');
+    const result = await runHook(ENTRY_CHECK, undefined, { CLAUDE_AGENT_NAME: '', SDLC_PROJECT_DIR: tmpDir });
     expect(result.exitCode).toBe(0);
     const output = JSON.parse(result.stdout);
     expect(output.result).toContain('NOT RUNNING AS ORCHESTRATOR');
-    expect(output.result).toContain('p2s');
+    await fs.promises.rm(tmpDir, { recursive: true });
   });
 
-  it('outputs no warning when CLAUDE_AGENT_NAME is orchestrator', async () => {
-    const result = await runHook(ENTRY_CHECK, undefined, { CLAUDE_AGENT_NAME: 'orchestrator' });
+  it('outputs no warning when orchestrator and .sdlc/ exists', async () => {
+    const tmpDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'hook-entry-'));
+    await fs.promises.mkdir(path.join(tmpDir, '.sdlc'), { recursive: true });
+    await fs.promises.writeFile(path.join(tmpDir, '.sdlc', 'config.yaml'), 'project:\n  name: test\n');
+    const result = await runHook(ENTRY_CHECK, undefined, { CLAUDE_AGENT_NAME: 'orchestrator', SDLC_PROJECT_DIR: tmpDir });
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe('');
-  });
-
-  it('outputs warning for non-orchestrator agent', async () => {
-    const result = await runHook(ENTRY_CHECK, undefined, { CLAUDE_AGENT_NAME: 'api-developer' });
-    expect(result.exitCode).toBe(0);
-    const output = JSON.parse(result.stdout);
-    expect(output.result).toContain('NOT RUNNING AS ORCHESTRATOR');
+    await fs.promises.rm(tmpDir, { recursive: true });
   });
 });

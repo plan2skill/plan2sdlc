@@ -20,7 +20,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/entry-check.js"
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/entry-check.cjs"
           }
         ]
       }
@@ -31,7 +31,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/sdlc-secrets-guard.js"
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/sdlc-secrets-guard.cjs"
           }
         ]
       },
@@ -40,7 +40,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/sdlc-write-guard.js"
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/sdlc-write-guard.cjs"
           }
         ]
       }
