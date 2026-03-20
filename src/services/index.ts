@@ -76,3 +76,13 @@ export {
   type ConventionEntry,
   type EcosystemReport,
 } from './ecosystem-scanner.js';
+
+export {
+  runInitScan,
+  generateConfig,
+  backupClaudeConfig,
+  renderTemplate,
+  generateDomainAgents,
+  generateRegistry,
+} from './init.js';
+export type { InitResult } from './init.js';
