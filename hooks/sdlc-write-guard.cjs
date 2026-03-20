@@ -48,6 +48,8 @@ const QA_LEAD_ALLOWED = ['testing.md', 'e2e.md'];
 
 function isClaudePath(filePath) {
   const normalized = filePath.replace(/\\/g, '/');
+  // Don't guard user memory or project settings — only .claude/ in project root
+  if (normalized.includes('/.claude/projects/') || normalized.includes('/.claude/memory/')) return false;
   return normalized.startsWith('.claude/') || normalized.includes('/.claude/');
 }
 
