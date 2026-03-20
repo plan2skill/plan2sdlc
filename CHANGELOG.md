@@ -5,6 +5,20 @@ All notable changes to the claude-sdlc plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-03-21
+
+### Changed
+- REVIEW v2 — two-stage review: spec compliance gate + 3-agent parallel quality review with confidence scoring (>= 80 threshold)
+- PLAN v2 — wave-based task decomposition with plan review subagent
+- POST_MORTEM v2 — 4-phase systematic debugging (root cause -> pattern -> hypothesis -> implementation)
+- MERGE v2 — verification-before-completion pattern with fresh test runs
+- BRAINSTORM v2 — structured flow with Mermaid diagrams, spec review subagent, anti-pattern lists
+
+### Removed
+- All "with superpowers / without superpowers" branching from session skills
+- Cost tracking references from session skills
+- Express brainstorm server references (deferred to v2.1)
+
 ## [0.4.0] - 2026-03-21
 
 ### Changed
