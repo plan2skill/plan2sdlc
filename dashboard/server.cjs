@@ -1,3 +1,11 @@
+// Prevent launching inside Claude Code session
+if (process.env.CLAUDECODE) {
+  console.error('Error: Dashboard cannot be launched inside a Claude Code session.');
+  console.error('Open a separate terminal and run:');
+  console.error('  node dashboard/server.cjs');
+  process.exit(1);
+}
+
 const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');

@@ -6,24 +6,28 @@ user-invocable: true
 
 # /sdlc dashboard
 
-Launch the Pixel Agents browser dashboard.
+⚠ **The dashboard must be launched from a separate terminal, not from inside Claude Code.**
 
-## Process
+Tell the user:
 
-1. Start the dashboard server:
-   ```bash
-   node dashboard/server.cjs
-   ```
-   This opens http://localhost:3456 in your default browser.
+```
+The SDLC Dashboard includes a built-in Claude CLI terminal,
+so it cannot run inside an existing Claude Code session.
 
-2. The dashboard shows:
-   - **Left**: Pixel office with agent visualization
-   - **Right**: Locked Claude CLI terminal (orchestrator)
-   - **Bottom**: Workflow progress bar
-   - **Top**: Status bar (tasks, cost, active workflows)
+Open a new PowerShell/terminal window and run:
 
-3. To stop: press Ctrl+C in the terminal where you launched it, or close the browser tab.
+  cd {project_directory}
+  node node_modules/claude-sdlc/dashboard/server.cjs
 
-## Requirements
-- Node.js 18+
-- The dashboard runs on localhost:3456 (configurable via SDLC_DASHBOARD_PORT env var)
+Or if you have the plugin source:
+
+  node C:\plan2sdlc\dashboard\server.cjs
+
+This will open http://localhost:3456 with:
+  • Left: Pixel office with agent visualization
+  • Right: Claude CLI terminal (orchestrator)
+  • Bottom: Workflow progress bar
+  • Top: Status bar (tasks, cost, active workflows)
+```
+
+Do NOT try to run `node dashboard/server.cjs` via Bash tool — it will fail with "cannot launch inside Claude Code session".
