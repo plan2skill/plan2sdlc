@@ -9,11 +9,15 @@
       html, body, #root { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
     </style>
     <script>
-      // Mock VS Code API for browser
+      // Mock VS Code API
       window.acquireVsCodeApi = function() {
         const state = {};
         return {
           postMessage: function(msg) {
+            if (msg.type === 'webviewReady') {
+              // Pixel-agents signals it's ready — send all init data
+              setTimeout(initPixelAgents, 100);
+            }
             window.parent.postMessage({ source: 'pixel-agents', payload: msg }, '*');
           },
           getState: function() { return state; },
@@ -21,106 +25,145 @@
         };
       };
 
-      // Agent tracking
-      let agentIdCounter = 1;
-      const agentMap = {}; // name → numeric id
+      // Load an image as ImageBitmap
+      async function loadImage(url) {
+        const response = await fetch(url);
+        const blob = await response.blob();
+        return await createImageBitmap(blob);
+      }
 
-      function getOrCreateAgent(name) {
-        if (!agentMap[name]) {
-          agentMap[name] = agentIdCounter++;
-          // Create agent in pixel office
-          window.postMessage({
-            type: 'agentCreated',
-            id: agentMap[name],
-            folderName: name,
-          }, '*');
+      // Load all furniture from manifests
+      async function loadFurniture() {
+        const furnitureTypes = [
+          'BIN','BOOKSHELF','CACTUS','CLOCK','COFFEE','COFFEE_TABLE',
+          'CUSHIONED_BENCH','CUSHIONED_CHAIR','DESK','DOUBLE_BOOKSHELF',
+          'HANGING_PLANT','LARGE_PAINTING','LARGE_PLANT','PC','PLANT',
+          'PLANT_2','POT','SMALL_PAINTING','SMALL_PAINTING_2','SMALL_TABLE',
+          'SOFA','TABLE_FRONT','WHITEBOARD','WOODEN_BENCH','WOODEN_CHAIR'
+        ];
+        const catalog = [];
+        const sprites = {};
+        for (const type of furnitureTypes) {
+          try {
+            const resp = await fetch(`./pixel-assets/furniture/${type}/manifest.json`);
+            const manifest = await resp.json();
+            catalog.push({ type, manifest });
+            // Load sprite images referenced in manifest
+            const typeSprites = {};
+            for (const variant of Object.keys(manifest.variants || {})) {
+              const img = manifest.variants[variant];
+              if (img && img.file) {
+                typeSprites[variant] = await loadImage(`./pixel-assets/furniture/${type}/${img.file}`);
+              }
+            }
+            // Also load default sprite
+            if (manifest.file) {
+              typeSprites['default'] = await loadImage(`./pixel-assets/furniture/${type}/${manifest.file}`);
+            }
+            // Load all PNGs in the type directory
+            for (const key of Object.keys(manifest)) {
+              if (typeof manifest[key] === 'string' && manifest[key].endsWith('.png')) {
+                const spriteName = key;
+                typeSprites[spriteName] = await loadImage(`./pixel-assets/furniture/${type}/${manifest[key]}`);
+              }
+            }
+            sprites[type] = typeSprites;
+          } catch(e) {
+            // Skip furniture that fails to load
+          }
         }
-        return agentMap[name];
+        return { catalog, sprites };
       }
 
-      function setAgentActive(name, toolName) {
-        const id = getOrCreateAgent(name);
-        window.postMessage({
-          type: 'agentSelected',
-          id: id,
-        }, '*');
-        window.postMessage({
-          type: 'agentToolStart',
-          id: id,
-          toolId: 'tool-' + Date.now(),
-          status: toolName || 'Working...',
-        }, '*');
+      async function initPixelAgents() {
+        try {
+          // 1. Load character sprites (6 characters)
+          const characters = [];
+          for (let i = 0; i < 6; i++) {
+            try {
+              const bmp = await loadImage(`./pixel-assets/characters/char_${i}.png`);
+              characters.push(bmp);
+            } catch(e) {}
+          }
+          window.postMessage({ type: 'characterSpritesLoaded', characters }, '*');
+
+          // 2. Load floor tiles (9 types)
+          const floors = [];
+          for (let i = 0; i < 9; i++) {
+            try {
+              const bmp = await loadImage(`./pixel-assets/floors/floor_${i}.png`);
+              floors.push(bmp);
+            } catch(e) {}
+          }
+          window.postMessage({ type: 'floorTilesLoaded', sprites: floors }, '*');
+
+          // 3. Load wall tiles
+          const walls = [];
+          try {
+            const bmp = await loadImage(`./pixel-assets/walls/wall_0.png`);
+            walls.push(bmp);
+          } catch(e) {}
+          window.postMessage({ type: 'wallTilesLoaded', sets: walls }, '*');
+
+          // 4. Load furniture
+          const { catalog, sprites } = await loadFurniture();
+          window.postMessage({ type: 'furnitureAssetsLoaded', catalog, sprites }, '*');
+
+          // 5. Load layout
+          const layoutResp = await fetch('./pixel-assets/default-layout-1.json');
+          const layout = await layoutResp.json();
+          window.postMessage({ type: 'layoutLoaded', layout }, '*');
+
+          // 6. Settings
+          window.postMessage({ type: 'settingsLoaded', soundEnabled: false }, '*');
+
+          // 7. Workspace
+          window.postMessage({ type: 'workspaceFolders', folders: [{ name: 'project', uri: '/' }] }, '*');
+
+          // 8. Create orchestrator agent
+          window.postMessage({ type: 'existingAgents', agents: [1], agentMeta: {}, folderNames: { 1: 'orchestrator' } }, '*');
+
+          console.log('[pixel-office] Init complete: characters=' + characters.length + ' floors=' + floors.length + ' furniture=' + catalog.length);
+        } catch(e) {
+          console.error('[pixel-office] Init failed:', e);
+        }
       }
 
-      function setAgentIdle(name) {
-        const id = agentMap[name];
-        if (!id) return;
-        window.postMessage({
-          type: 'agentToolsClear',
-          id: id,
-        }, '*');
-      }
-
-      function setAgentWaiting(name) {
-        const id = getOrCreateAgent(name);
-        window.postMessage({
-          type: 'agentStatus',
-          id: id,
-          status: 'waiting',
-        }, '*');
-      }
-
-      // Init: load layout + settings, create default agents
-      window.addEventListener('load', function() {
-        setTimeout(function() {
-          // Load layout
-          fetch('./pixel-assets/default-layout-1.json')
-            .then(r => r.json())
-            .then(layout => {
-              window.postMessage({ type: 'layoutLoaded', layout: layout }, '*');
-
-              // Give layout time to render, then create agents
-              setTimeout(function() {
-                // Send settings
-                window.postMessage({ type: 'settingsLoaded', settings: {
-                  soundEnabled: false,
-                  zoom: 2,
-                }}, '*');
-
-                // Create orchestrator agent immediately
-                getOrCreateAgent('orchestrator');
-                setAgentActive('orchestrator', 'Orchestrating...');
-              }, 300);
-            });
-        }, 200);
-      });
-
-      // Listen for messages from parent dashboard (terminal activity)
+      // Listen for messages from parent
       window.addEventListener('message', function(event) {
         if (event.data && event.data.source === 'sdlc-dashboard') {
-          const payload = event.data.payload;
-
-          if (payload.action === 'createAgent') {
-            getOrCreateAgent(payload.name);
+          const p = event.data.payload;
+          if (p.action === 'createAgent') {
+            const id = Object.keys(window._agentMap || {}).length + 2;
+            window._agentMap = window._agentMap || {};
+            window._agentMap[p.name] = id;
+            window.postMessage({ type: 'agentCreated', id, folderName: p.name }, '*');
           }
-          else if (payload.action === 'activateAgent') {
-            setAgentActive(payload.name, payload.tool);
-          }
-          else if (payload.action === 'idleAgent') {
-            setAgentIdle(payload.name);
-          }
-          else if (payload.action === 'waitingAgent') {
-            setAgentWaiting(payload.name);
-          }
-          else if (payload.action === 'stateUpdate') {
-            // Create agents from registry/workflow state
-            const agents = payload.agents || [];
-            for (const name of agents) {
-              getOrCreateAgent(name);
+          else if (p.action === 'activateAgent') {
+            window._agentMap = window._agentMap || {};
+            let id = window._agentMap[p.name];
+            if (!id) {
+              id = Object.keys(window._agentMap).length + 2;
+              window._agentMap[p.name] = id;
+              window.postMessage({ type: 'agentCreated', id, folderName: p.name }, '*');
             }
-            const active = payload.activeAgents || [];
-            for (const a of active) {
-              setAgentActive(a.name, a.tool);
+            window.postMessage({ type: 'agentSelected', id }, '*');
+            window.postMessage({ type: 'agentToolStart', id, toolId: 'tool-' + Date.now(), status: p.tool || 'Working...' }, '*');
+          }
+          else if (p.action === 'stateUpdate') {
+            window._agentMap = window._agentMap || {};
+            for (const name of (p.agents || [])) {
+              if (!window._agentMap[name]) {
+                const id = Object.keys(window._agentMap).length + 2;
+                window._agentMap[name] = id;
+                window.postMessage({ type: 'agentCreated', id, folderName: name }, '*');
+              }
+            }
+            for (const a of (p.activeAgents || [])) {
+              const id = window._agentMap[a.name];
+              if (id) {
+                window.postMessage({ type: 'agentToolStart', id, toolId: 'tool-' + Date.now(), status: a.tool || 'Working...' }, '*');
+              }
             }
           }
         }
