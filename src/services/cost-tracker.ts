@@ -29,6 +29,10 @@ export interface SessionCostSummary {
   agents: CostEntry[];
   totalCost: number;
   totalTurns: number;
+  /** Session outcome — populated when available (e.g., from SessionLog merge). */
+  result?: 'success' | 'failure' | 'escalated';
+  /** Complexity tier — populated from backlog item when available. */
+  complexity?: 'S' | 'M' | 'L' | 'XL';
 }
 
 export interface PeriodCostReport {
