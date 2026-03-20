@@ -56,3 +56,6 @@ git revert {hash}       Manual revert
 git stash               Stash all changes
 /sdlc uninstall         Remove plugin entirely
 ```
+
+---
+*claude-sdlc by [Plan2Skill](https://plan2skill.com)*

@@ -23,6 +23,8 @@ function main() {
       '',
       'To use SDLC flow:  exit and run: p2s',
       'To continue anyway: this is fine for quick exploration/research',
+      '',
+      'claude-sdlc by Plan2Skill \u2014 https://plan2skill.com',
     ].join('\n');
 
     const result = JSON.stringify({ result: warning });
