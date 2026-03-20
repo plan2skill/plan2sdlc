@@ -137,6 +137,57 @@ function formatRecent(items: BacklogItem[], now?: Date): string {
   return `${header}\n${lines.join('\n')}`;
 }
 
+/**
+ * Format a compact inline progress view for a single workflow.
+ * Shown by the orchestrator after each session step.
+ */
+export function formatWorkflowProgress(
+  taskId: string,
+  title: string,
+  taskType: string,
+  complexity: string,
+  domains: string[],
+  sessionChain: string[],
+  currentSessionIndex: number,
+  domainStatus: Record<string, 'done' | 'in-progress' | 'pending'>,
+  costSoFar: number,
+  budget: number,
+): string {
+  const lines: string[] = [];
+  lines.push(SEPARATOR);
+  lines.push(`📋 ${taskId}: ${title}`);
+  lines.push(`   ${taskType} | ${complexity} | ${domains.join(', ')}`);
+  lines.push('');
+
+  for (let i = 0; i < sessionChain.length; i++) {
+    let icon: string;
+    if (i < currentSessionIndex) {
+      icon = '✅';
+    } else if (i === currentSessionIndex) {
+      icon = '▶ ';
+    } else {
+      icon = '⬚ ';
+    }
+    lines.push(`   ${icon} ${sessionChain[i]}`);
+  }
+
+  lines.push('');
+  lines.push(`   Cost so far: $${costSoFar.toFixed(2)} | Budget: $${budget.toFixed(2)}`);
+
+  if (Object.keys(domainStatus).length > 0) {
+    const domainLine = Object.entries(domainStatus)
+      .map(([d, s]) => {
+        const di = s === 'done' ? '✅' : s === 'in-progress' ? '▶' : '⬚';
+        return `${d} ${di}`;
+      })
+      .join(' | ');
+    lines.push(`   Domains: ${domainLine}`);
+  }
+
+  lines.push(SEPARATOR);
+  return lines.join('\n');
+}
+
 function formatTechDebt(techDebt: TechDebtRegister | null): string | null {
   if (!techDebt || techDebt.items.length === 0) return null;
 

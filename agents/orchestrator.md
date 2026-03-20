@@ -68,14 +68,49 @@ Session chain: {chain}
 For each session in the chain:
 1. Read the session skill from `skills/sessions/{session}.md`
 2. Follow its process
-3. If the session says to use a superpowers skill → invoke it via Skill tool
+3. If the session says to use a superpowers skill → check config, invoke via Skill tool
 4. Write handoff state to `.sdlc/state.json`
-5. Proceed to next session
+5. **Show progress to user** (see Progress Display below)
+6. Proceed to next session
 
 ### Step 4: Track State
 - Create/update backlog item in `.sdlc/backlog.json`
 - Track active workflow in `.sdlc/state.json`
 - Log cost in `.sdlc/history/`
+
+## Progress Display
+
+**CRITICAL: After EVERY session completes, show the user a progress summary.**
+
+Format:
+```
+───────────────────────────────────────────────────────
+📋 {TASK-ID}: {title}
+   {type} | {complexity} | {domains}
+
+   ✅ BRAINSTORM  → spec approved
+   ✅ PLAN        → 4 domain tasks, 2 waves
+   ▶  EXECUTE     → api-developer working... (2/4 domains done)
+   ⬚  REVIEW
+   ⬚  MERGE
+
+   Cost so far: $4.20 | Budget: $15.00
+   Domains: api ✅ | web ▶ | mobile ⬚
+───────────────────────────────────────────────────────
+```
+
+Symbols:
+- ✅ completed
+- ▶  in progress
+- ⬚  pending
+- ❌ failed / needs retry
+- ⏸  paused (HITL needed)
+
+Show this after:
+- Each session completes
+- User says "status" or "progress"
+- Before asking for HITL approval
+- On "continue" (after resuming)
 
 ## On "continue"
 1. Read `.sdlc/state.json`

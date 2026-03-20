@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatStatus, type StatusData } from '../services/status-formatter.js';
+import { formatStatus, formatWorkflowProgress, type StatusData } from '../services/status-formatter.js';
 import type { BacklogItem } from '../types/backlog.js';
 import type { WorkflowState } from '../types/workflow.js';
 import type { TechDebtRegister } from '../types/tech-debt.js';
@@ -257,5 +257,38 @@ describe('formatStatus', () => {
     };
     const output = formatStatus(data, NOW);
     expect(output).not.toContain('TECH DEBT');
+  });
+});
+
+describe('formatWorkflowProgress', () => {
+  it('shows correct progress symbols', () => {
+    const output = formatWorkflowProgress(
+      'TASK-001', 'Add daily rewards', 'feature', 'L',
+      ['api', 'web'],
+      ['BRAINSTORM', 'PLAN', 'EXECUTE', 'REVIEW', 'MERGE'],
+      2, // EXECUTE is current
+      { api: 'done', web: 'in-progress' },
+      4.20, 15.00,
+    );
+    expect(output).toContain('✅ BRAINSTORM');
+    expect(output).toContain('✅ PLAN');
+    expect(output).toContain('▶  EXECUTE');
+    expect(output).toContain('⬚  REVIEW');
+    expect(output).toContain('⬚  MERGE');
+    expect(output).toContain('$4.20');
+    expect(output).toContain('$15.00');
+    expect(output).toContain('api ✅');
+    expect(output).toContain('web ▶');
+  });
+
+  it('shows all pending when at first session', () => {
+    const output = formatWorkflowProgress(
+      'TASK-002', 'Fix bug', 'bugfix', 'S',
+      ['api'], ['QUICK_FIX', 'MERGE'], 0,
+      {}, 0, 1.00,
+    );
+    expect(output).toContain('▶  QUICK_FIX');
+    expect(output).toContain('⬚  MERGE');
+    expect(output).toContain('$0.00');
   });
 });

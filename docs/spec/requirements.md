@@ -863,6 +863,20 @@ Documentation: user guide (daily workflow), agent authoring guide (custom agents
 
 ---
 
+### REQ-51: Web Dashboard (Backlog — v0.3+)
+**Priority:** Deferred
+
+Browser-based dashboard showing real-time SDLC state: backlog board, workflow progress, cost charts, agent health.
+
+**Acceptance Criteria:**
+- [ ] AC-51.1: Local web server serving dashboard UI (localhost)
+- [ ] AC-51.2: Reads `.sdlc/` state files and renders: backlog kanban board, active workflows, cost charts
+- [ ] AC-51.3: Auto-refresh when state files change (file watcher)
+- [ ] AC-51.4: `/sdlc dashboard` command to launch
+- [ ] AC-51.5: Works without internet (fully local)
+
+---
+
 ## Step 3: Dependency Analysis
 
 ### Dependency Matrix

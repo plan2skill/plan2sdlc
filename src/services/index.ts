@@ -55,6 +55,7 @@ export {
 
 export {
   formatStatus,
+  formatWorkflowProgress,
 } from './status-formatter.js';
 
 export type { StatusData } from './status-formatter.js';
