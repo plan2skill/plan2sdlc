@@ -90,6 +90,15 @@ function main() {
         process.exit(0);
         return;
       }
+      // Allow bootstrap: if .sdlc/config.yaml doesn't exist yet, any agent can write
+      // (init is creating the directory for the first time)
+      const fs = require('fs');
+      const path = require('path');
+      const cwd = process.env.SDLC_PROJECT_DIR || process.cwd();
+      if (!fs.existsSync(path.join(cwd, '.sdlc', 'config.yaml'))) {
+        process.exit(0);
+        return;
+      }
       // Block non-governance agents
       if (!agentMatches(agentName, SDLC_STATE_AGENTS)) {
         const result = JSON.stringify({
