@@ -1,5 +1,7 @@
 node_modules/
 dist/
+# MCP server dist is committed (pre-built for plugin users)
+!mcp/registry/dist/
 .env*
 !.env.example
 *.log

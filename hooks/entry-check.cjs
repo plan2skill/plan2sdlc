@@ -301,7 +301,38 @@ function buildStateInjection(sdlcDir) {
   return payload;
 }
 
+/**
+ * Ensure MCP registry dependencies are installed (runs once).
+ * Checks for node_modules in mcp/registry/ and installs if missing.
+ */
+function ensureMcpDeps() {
+  var pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || '';
+  if (!pluginRoot) return;
+
+  var mcpDir = path.join(pluginRoot, 'mcp', 'registry');
+  var pkgJson = path.join(mcpDir, 'package.json');
+  var nodeModules = path.join(mcpDir, 'node_modules');
+
+  if (!fs.existsSync(pkgJson)) return;
+  if (fs.existsSync(nodeModules)) return;
+
+  // Install dependencies silently
+  try {
+    var execSync = require('child_process').execSync;
+    execSync('npm install --production --silent', {
+      cwd: mcpDir,
+      stdio: 'ignore',
+      timeout: 60000,
+    });
+  } catch (_e) {
+    // Silently ignore — MCP server will self-gate if deps missing
+  }
+}
+
 function main() {
+  // Ensure MCP registry deps on every session start
+  ensureMcpDeps();
+
   var agentName = process.env.CLAUDE_AGENT_NAME || '';
   var cwd = process.env.SDLC_PROJECT_DIR || process.cwd();
   var sdlcDir = path.join(cwd, '.sdlc');
