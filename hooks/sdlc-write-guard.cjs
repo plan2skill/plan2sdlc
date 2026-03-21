@@ -80,7 +80,24 @@ function main() {
     const toolInput = data.tool_input || {};
     const filePath = toolInput.file_path || '';
 
-    const agentName = process.env.CLAUDE_AGENT_NAME || process.env.AGENT_NAME || '';
+    // Agent identification: prefer stdin JSON field, fallback to env var
+    const agentName = data.agent_type || process.env.CLAUDE_AGENT_NAME || process.env.AGENT_NAME || '';
+
+    // ORCHESTRATOR SOURCE CODE GUARD:
+    // If agent is orchestrator, block writes to anything except .sdlc/ and docs/
+    if (agentMatches(agentName, ['orchestrator']) && !isSdlcPath(filePath) && !isClaudePath(filePath)) {
+      const normalized = filePath.replace(/\\/g, '/');
+      const isDocsPath = normalized.startsWith('docs/') || normalized.includes('/docs/');
+      if (!isDocsPath) {
+        const result = JSON.stringify({
+          decision: 'block',
+          reason: 'SDLC write guard: orchestrator can only write to .sdlc/ and docs/ — use /sdlc execute for code changes',
+        });
+        process.stdout.write(result);
+        process.exit(2);
+        return;
+      }
+    }
 
     // Check .sdlc/ state file protection
     if (isSdlcPath(filePath)) {

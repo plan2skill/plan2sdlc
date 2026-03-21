@@ -5,6 +5,25 @@ All notable changes to the claude-sdlc plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2026-03-21
+
+### Added
+- **Deterministic code dispatcher** — Node.js script that spawns headless `claude -p` sessions per task instead of relying on LLM Agent tool dispatch. Solves the "orchestrator collapse" problem where the LLM bypasses delegation and writes code itself.
+- **plan.json** — structured execution artifact produced by orchestrator, consumed by dispatcher. Machine-readable task specs with domain, agent, context, acceptance criteria.
+- **`/sdlc execute` skill** — triggers the dispatcher, shows progress, supports resume after interruption.
+- **Orchestrator source code guard** — PreToolUse hook blocks orchestrator from writing anything except `.sdlc/` and `docs/`. Uses `agent_type` from stdin JSON for reliable agent identification.
+- **Boundary check module** — extracted reusable `git diff` boundary verification in `scripts/boundary-check.ts`.
+
+### Changed
+- **Orchestrator tools**: removed `Agent`, added `Write` (scoped to `.sdlc/` and `docs/` via hook). Orchestrator now produces plans, not dispatches.
+- **Pipeline flow**: EXECUTE phase is now handled by deterministic code, not by LLM. Orchestrator does EXPLORE → PLAN (produces plan.json) → user runs /sdlc execute → REVIEW → MERGE.
+- **Write guard**: now reads `agent_type` from hook stdin JSON (reliable) in addition to `CLAUDE_AGENT_NAME` env var (fallback).
+
+### Architecture
+- LLM does what it's good at: analysis, design, review
+- Code does what it's good at: enforcing rules, dispatching, boundary checks
+- Based on research: MetaGPT structured artifacts, Plan-and-Act (ICML 2025) physical separation, Devin VM isolation pattern
+
 ## [2.1.0] - 2026-03-21
 
 ### Added

@@ -293,6 +293,34 @@ describe('sdlc-write-guard', () => {
     expect(result.exitCode).toBe(0);
   });
 
+  it('blocks orchestrator from writing source code files', async () => {
+    const result = await runHook(
+      WRITE_GUARD,
+      JSON.stringify({ tool_name: 'Write', tool_input: { file_path: 'src/index.ts' }, agent_type: 'orchestrator' }),
+    );
+    expect(result.exitCode).toBe(2);
+    const output = JSON.parse(result.stdout);
+    expect(output.decision).toBe('block');
+    expect(output.reason).toContain('orchestrator can only write');
+  });
+
+  it('allows orchestrator to write .sdlc/plan.json', async () => {
+    const result = await runHook(
+      WRITE_GUARD,
+      JSON.stringify({ tool_name: 'Write', tool_input: { file_path: '.sdlc/plan.json' }, agent_type: 'orchestrator' }),
+      { CLAUDE_AGENT_NAME: 'orchestrator' },
+    );
+    expect(result.exitCode).toBe(0);
+  });
+
+  it('allows orchestrator to write docs/', async () => {
+    const result = await runHook(
+      WRITE_GUARD,
+      JSON.stringify({ tool_name: 'Write', tool_input: { file_path: 'docs/design.md' }, agent_type: 'orchestrator' }),
+    );
+    expect(result.exitCode).toBe(0);
+  });
+
   it('allows governance-architect to write .sdlc/ state files', async () => {
     const result = await runHook(
       WRITE_GUARD,
