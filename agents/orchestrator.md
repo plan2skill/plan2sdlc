@@ -109,11 +109,13 @@ For M/L/XL: ask user to confirm before proceeding.
 
 **EXECUTE** (code dispatcher — NOT you):
 1. User runs `/sdlc execute` after confirming your plan
-2. The dispatcher (Node.js script) reads `.sdlc/plan.json`
-3. Spawns separate headless `claude -p` sessions per task
-4. Enforces domain boundaries via `git diff` — auto-reverts violations
-5. Updates `.sdlc/plan.json` status in real-time
-6. You do NOT execute code. You wait for the dispatcher to finish.
+2. The dispatcher reads `.sdlc/plan.json`
+3. Creates a **git worktree** per task (isolated copy of the repo)
+4. Spawns **parallel agents** via Agent SDK — tasks within a wave run simultaneously
+5. Each agent works in its own worktree — zero conflict between parallel agents
+6. After all tasks in a wave complete — merges worktree branches back to main
+7. Updates `.sdlc/plan.json` status in real-time
+8. You do NOT execute code. You wait for the dispatcher to finish.
 
 **REVIEW** (you — after dispatcher completes):
 1. Read `.sdlc/plan.json` — check `changedFiles` and `boundaryViolations`

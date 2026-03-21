@@ -16,6 +16,8 @@ export interface PlanTask {
   testCommand: string;             // e.g. "pnpm test --filter api"
   context: string;                 // pasted types, interfaces, contracts
   isolation: 'worktree' | 'none';  // worktree = isolated git copy, none = direct
+  worktreePath: string | null;     // filled by dispatcher when isolation=worktree
+  branch: string | null;           // git branch for this worktree
   status: TaskStatus;
   attempts: number;
   maxAttempts: number;

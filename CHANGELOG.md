@@ -5,6 +5,31 @@ All notable changes to the claude-sdlc plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.0] - 2026-03-21
+
+### Breaking Changes
+- **Dispatcher rewritten** — now uses `@anthropic-ai/claude-agent-sdk` instead of `claude -p` CLI. Requires the SDK as a dependency.
+- **Parallel execution** — tasks within a wave run simultaneously (up to 3 concurrent by default, configurable via `SDLC_MAX_CONCURRENCY`). Previous dispatcher was sequential only.
+- **Git worktree per task** — each agent gets an isolated repo copy. Zero conflict between parallel agents. Worktrees are created in `.sdlc/worktrees/`, merged after wave completes, and cleaned up.
+
+### Added
+- `scripts/worktree.ts` — git worktree management (create, merge, remove, commit, prune)
+- `scripts/dispatcher-legacy.ts` — backup of v2.2 sequential dispatcher for rollback
+- `PlanTask.worktreePath` and `PlanTask.branch` fields for worktree tracking
+- Wave-level merge strategy: fast-forward → auto-merge → conflict detection → HITL
+- Concurrency limit (default 3) to avoid rate limiting
+- Per-task abort controller with 10-minute timeout
+- Per-task budget cap ($5 default via `maxBudgetUsd`)
+
+### Changed
+- Orchestrator prompt updated: EXECUTE section describes parallel worktree execution
+- Plugin auto-update: orchestrator ships from plugin, not generated locally. Domain agents have version tags for migration detection.
+
+### Rollback
+```bash
+git checkout v2.2.0  # full rollback to sequential dispatcher
+```
+
 ## [2.2.0] - 2026-03-21
 
 ### Added

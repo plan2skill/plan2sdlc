@@ -1,6 +1,6 @@
 {
   "name": "claude-sdlc",
-  "version": "2.2.0",
+  "version": "3.0.0",
   "description": "Full SDLC governance plugin for Claude Code — orchestrator, agent teams, workflow engine",
   "author": "plan2skill",
   "license": "MIT",
@@ -24,6 +24,7 @@
     "vitest": "^3.0.0"
   },
   "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.2.81",
     "yaml": "^2.8.2"
   }
 }
