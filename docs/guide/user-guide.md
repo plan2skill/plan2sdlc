@@ -45,7 +45,7 @@ The recommended daily workflow uses the orchestrator as your entry point:
 
 ```bash
 # Start a session with the orchestrator
-claude --agent orchestrator
+claude --agent claude-sdlc:orchestrator
 # Or use the alias if configured:
 p2s
 ```

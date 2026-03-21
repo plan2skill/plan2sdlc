@@ -45,10 +45,10 @@ Orchestrator:
 
 ```bash
 # Start with orchestrator
-claude --agent orchestrator
+claude --agent claude-sdlc:orchestrator
 
 # Or create an alias
-alias p2s="claude --agent orchestrator"
+alias p2s="claude --agent claude-sdlc:orchestrator"
 
 # Dispatch a task
 /sdlc dispatch "add user authentication"

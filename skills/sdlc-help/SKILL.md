@@ -29,7 +29,7 @@ user-invocable: true
 ```
 
 ### DAILY WORKFLOW
-1. Start:    `claude --agent orchestrator` (or alias: `p2s`)
+1. Start:    `claude --agent claude-sdlc:orchestrator` (or alias: `p2s`)
 2. Work:     describe task -> orchestrator handles routing
 3. Review:   approve changes at HITL gates
 4. Check:    `/sdlc status` for progress

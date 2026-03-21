@@ -874,7 +874,7 @@ claude plugin add claude-sdlc
 claude plugin add https://github.com/user/claude-sdlc
 
 # Initialize in project
-claude --agent orchestrator
+claude --agent claude-sdlc:orchestrator
 # > /sdlc init
 ```
 
@@ -3208,7 +3208,7 @@ For automated pipelines that skip interactive HITL:
 
 ```bash
 # Requires explicit opt-in flag
-claude --agent orchestrator -- --i-accept-risks --headless
+claude --agent claude-sdlc:orchestrator -- --i-accept-risks --headless
 
 # Without flag → refuses to run in headless mode
 # "SDLC plugin requires --i-accept-risks for headless execution.
@@ -3240,7 +3240,7 @@ $ claude plugin add claude-sdlc
 Plugin installed to ~/.claude/plugins/claude-sdlc/
   │
   ▼
-$ claude --agent orchestrator    (or alias: p2s)
+$ claude --agent claude-sdlc:orchestrator    (or alias: p2s)
   │
   ▼
 > /sdlc init
@@ -3264,7 +3264,7 @@ $ claude --agent orchestrator    (or alias: p2s)
   │
   ├─ 2e. Shell alias setup
   │   → "Add alias to your shell profile?"
-  │   → alias p2s="claude --agent orchestrator"
+  │   → alias p2s="claude --agent claude-sdlc:orchestrator"
   │
   ├─ 2f. Verification dry-run
   │   → classify sample task → routing OK?
@@ -3278,7 +3278,7 @@ $ claude --agent orchestrator    (or alias: p2s)
 │                                                             │
 │  QUICK START                                                │
 │  ──────────────────────────────────────────────────────     │
-│  Start:     p2s                (or: claude --agent orchestrator)│
+│  Start:     p2s                (or: claude --agent claude-sdlc:orchestrator)│
 │  New task:  just describe it   ("add daily rewards")        │
 │  Dispatch:  /sdlc dispatch "fix login bug"                  │
 │  Status:    /sdlc status       (backlog + active work)      │
@@ -3354,7 +3354,7 @@ if (!agent || agent !== 'orchestrator') {
       'To use SDLC flow:  exit and run: p2s',
       'To continue anyway: this is fine for quick exploration/research',
       '',
-      'Tip: add to your shell profile:  alias p2s="claude --agent orchestrator"',
+      'Tip: add to your shell profile:  alias p2s="claude --agent claude-sdlc:orchestrator"',
     ].join('\n'),
   });
   process.stdout.write(warning);
@@ -3379,7 +3379,7 @@ This means:
 To use SDLC flow:  exit and run: p2s
 To continue anyway: this is fine for quick exploration/research
 
-Tip: add to your shell profile:  alias p2s="claude --agent orchestrator"
+Tip: add to your shell profile:  alias p2s="claude --agent claude-sdlc:orchestrator"
 ```
 
 ### 24.3 Entry Modes
@@ -3391,7 +3391,7 @@ entry-modes:
 
   # Mode 1: Full SDLC (recommended daily driver)
   full-sdlc:
-    command: "p2s" or "claude --agent orchestrator"
+    command: "p2s" or "claude --agent claude-sdlc:orchestrator"
     behavior:
       - Full governance pipeline
       - Team composition from registry
@@ -3451,7 +3451,7 @@ Always accessible, shows context-aware help:
 
   DAILY WORKFLOW
   ─────────────────────────────────────────────
-  1. Start:    p2s (alias for claude --agent orchestrator)
+  1. Start:    p2s (alias for claude --agent claude-sdlc:orchestrator)
   2. Work:     describe task → orchestrator handles routing
   3. Review:   approve changes at HITL gates
   4. Check:    /sdlc status for progress
