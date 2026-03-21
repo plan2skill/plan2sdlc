@@ -49,7 +49,7 @@ describe('sdlc-secrets-guard', () => {
     expect(result.exitCode).toBe(2);
     const output = JSON.parse(result.stdout);
     expect(output.decision).toBe('block');
-    expect(output.reason).toContain('SDLC secrets guard');
+    expect(output.reason).toContain('SDLC guard');
   });
 
   it('blocks .env.production on Read', async () => {
@@ -147,7 +147,7 @@ describe('sdlc-secrets-guard', () => {
     expect(result.exitCode).toBe(2);
     const output = JSON.parse(result.stdout);
     expect(output.decision).toBe('block');
-    expect(output.reason).toContain('SDLC secrets guard');
+    expect(output.reason).toContain('SDLC guard');
   });
 
   it('allows Bash: cat .env.example', async () => {
@@ -268,15 +268,20 @@ describe('sdlc-write-guard', () => {
   });
 
   it('blocks non-governance agent from writing .sdlc/ state files', async () => {
+    // write-guard checks if .sdlc/config.yaml exists — if not, it's bootstrap mode and allows
+    const tmpDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'hook-wg-'));
+    await fs.promises.mkdir(path.join(tmpDir, '.sdlc'), { recursive: true });
+    await fs.promises.writeFile(path.join(tmpDir, '.sdlc', 'config.yaml'), 'project:\n  name: test\n');
     const result = await runHook(
       WRITE_GUARD,
       makeInput('Edit', { file_path: '.sdlc/backlog.json' }),
-      { CLAUDE_AGENT_NAME: 'api-developer' },
+      { CLAUDE_AGENT_NAME: 'api-developer', SDLC_PROJECT_DIR: tmpDir },
     );
     expect(result.exitCode).toBe(2);
     const output = JSON.parse(result.stdout);
     expect(output.decision).toBe('block');
     expect(output.reason).toContain('.sdlc/');
+    await fs.promises.rm(tmpDir, { recursive: true });
   });
 
   it('allows orchestrator to write .sdlc/ state files', async () => {
@@ -320,13 +325,15 @@ describe('entry-check', () => {
     await fs.promises.rm(tmpDir, { recursive: true });
   });
 
-  it('outputs no warning when orchestrator and .sdlc/ exists', async () => {
+  it('injects SDLC state when orchestrator and .sdlc/ exists', async () => {
     const tmpDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'hook-entry-'));
     await fs.promises.mkdir(path.join(tmpDir, '.sdlc'), { recursive: true });
     await fs.promises.writeFile(path.join(tmpDir, '.sdlc', 'config.yaml'), 'project:\n  name: test\n');
     const result = await runHook(ENTRY_CHECK, undefined, { CLAUDE_AGENT_NAME: 'orchestrator', SDLC_PROJECT_DIR: tmpDir });
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toBe('');
+    // Orchestrator gets state injection with project context
+    const output = JSON.parse(result.stdout);
+    expect(output.result).toContain('SDLC STATE');
     await fs.promises.rm(tmpDir, { recursive: true });
   });
 });
@@ -358,45 +365,39 @@ describe('sdlc-superpowers-guard', () => {
     await fs.promises.rm(tmpDir, { recursive: true });
   });
 
-  it('blocks superpowers when master toggle is false', async () => {
+  it('blocks all superpowers when SDLC is active (v2 internalized)', async () => {
     const tmpDir = await makeTmpWithConfig('integrations:\n  superpowers:\n    enabled: false\n');
     const input = JSON.stringify({ tool_name: 'Skill', tool_input: { skill: 'superpowers:brainstorming' } });
     const result = await runHook(SUPERPOWERS_GUARD, input, { cwd: tmpDir });
     expect(result.exitCode).toBe(2);
-    expect(result.stdout).toContain('disabled');
+    expect(result.stdout).toContain('block');
     await fs.promises.rm(tmpDir, { recursive: true });
   });
 
-  it('blocks specific superpowers skill when disabled in config', async () => {
-    const tmpDir = await makeTmpWithConfig('integrations:\n  superpowers:\n    enabled: true\n    tdd: false\n');
-    const input = JSON.stringify({ tool_name: 'Skill', tool_input: { skill: 'superpowers:test-driven-development' } });
+  it('blocks superpowers even when enabled in config (v2 internalized)', async () => {
+    const tmpDir = await makeTmpWithConfig('integrations:\n  superpowers:\n    enabled: true\n    brainstorming: true\n');
+    const input = JSON.stringify({ tool_name: 'Skill', tool_input: { skill: 'superpowers:brainstorming' } });
     const result = await runHook(SUPERPOWERS_GUARD, input, { cwd: tmpDir });
+    // v2 blocks ALL superpowers when .sdlc/ exists — patterns are internalized
     expect(result.exitCode).toBe(2);
     await fs.promises.rm(tmpDir, { recursive: true });
   });
 
-  it('allows superpowers skill when enabled in config', async () => {
-    const tmpDir = await makeTmpWithConfig('integrations:\n  superpowers:\n    enabled: true\n    brainstorming: true\n');
-    const input = JSON.stringify({ tool_name: 'Skill', tool_input: { skill: 'superpowers:brainstorming' } });
-    const result = await runHook(SUPERPOWERS_GUARD, input, { cwd: tmpDir });
-    expect(result.exitCode).toBe(0);
-    await fs.promises.rm(tmpDir, { recursive: true });
-  });
-
-  it('blocks using-superpowers auto-invocation when running as orchestrator', async () => {
+  it('blocks using-superpowers auto-invocation when SDLC active', async () => {
     const tmpDir = await makeTmpWithConfig('integrations:\n  superpowers:\n    enabled: true\n');
     const input = JSON.stringify({ tool_name: 'Skill', tool_input: { skill: 'superpowers:using-superpowers' } });
     const result = await runHook(SUPERPOWERS_GUARD, input, { CLAUDE_AGENT_NAME: 'orchestrator', cwd: tmpDir });
     expect(result.exitCode).toBe(2);
-    expect(result.stdout).toContain('orchestrator controls');
+    expect(result.stdout).toContain('block');
     await fs.promises.rm(tmpDir, { recursive: true });
   });
 
-  it('always allows utility skills (worktrees, parallel agents)', async () => {
+  it('blocks utility skills when SDLC active (v2 internalized)', async () => {
     const tmpDir = await makeTmpWithConfig('integrations:\n  superpowers:\n    enabled: false\n');
     const input = JSON.stringify({ tool_name: 'Skill', tool_input: { skill: 'superpowers:using-git-worktrees' } });
     const result = await runHook(SUPERPOWERS_GUARD, input, { cwd: tmpDir });
-    expect(result.exitCode).toBe(0);
+    // v2 blocks ALL superpowers — utility skills included
+    expect(result.exitCode).toBe(2);
     await fs.promises.rm(tmpDir, { recursive: true });
   });
 });

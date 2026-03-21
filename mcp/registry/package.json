@@ -1,0 +1,20 @@
+{
+  "name": "@claude-sdlc/registry-mcp",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "sql.js": "^1.11.0",
+    "yaml": "^2.7.0"
+  },
+  "devDependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@types/sql.js": "^1.4.10",
+    "typescript": "^5.8.0",
+    "vitest": "^3.1.0"
+  }
+}

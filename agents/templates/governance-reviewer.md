@@ -3,6 +3,7 @@ name: governance-reviewer
 description: Code reviewer — reviews implementations for quality, patterns, and spec compliance.
 model: opus
 effort: medium
+color: red
 tools: Read, Glob, Grep, Bash
 permissionMode: plan
 maxTurns: 30

@@ -3,6 +3,7 @@ name: governance-architect
 description: System architect — designs specs, reviews architecture, manages domain boundaries.
 model: opus
 effort: high
+color: cyan
 tools: Read, Glob, Grep, Bash, Agent
 permissionMode: plan
 maxTurns: 40

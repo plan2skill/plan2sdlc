@@ -5,6 +5,27 @@ All notable changes to the claude-sdlc plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-03-21
+
+### Added
+- **Semantic Registry (PoC)** — SQLite-backed MCP server with SCD2 temporal tracking for code entities (files, endpoints, components, types, services). Tools: registry_lookup, registry_search, registry_update, registry_history, registry_domain_summary, registry_init_scan. Enabled by default, disable via `experimental.registry.enabled: false`.
+- **Project Ledger** — `.sdlc/ledger.md` compact index (~150 lines max) + `.sdlc/ledger/` archive per release. Orchestrator reads ledger at session start for quick project context. MERGE appends entries, RELEASE archives and resets.
+- **Execution Plan with sticky progress** — orchestrator creates TaskCreate checklist after PLAN stage, updates in real-time via TaskUpdate. Users see live progress bar in terminal.
+- **Domain boundary check** — programmatic `git diff` verification after every EXECUTE, reverts out-of-domain changes automatically.
+- **Agent color coding** — orchestrator (blue), developers (green), testers (yellow), architect (cyan), reviewer (red) for visual navigation in console.
+- **Release notes flow** — full release session with changelog generation, release notes, version bump, ledger archival.
+
+### Changed
+- **Orchestrator redesign** — now performs all governance roles directly (explorer, architect, reviewer). Separate governance-architect and governance-reviewer agents are no longer dispatched as subagents; orchestrator acts in those roles itself.
+- **Domain isolation model** — replaced non-functional `disallowedTools` path patterns with two-level approach: `tools` allowlist (platform-enforced) + prompt-based domain constraint with DOMAIN_VIOLATION escalation protocol.
+- **Dispatch protocol** — orchestrator now pastes actual types/interfaces/contracts in dispatch messages instead of file references. Domain developers should not need to read outside their domain.
+- Removed `maxTurns: 100` from orchestrator — was causing pipeline collapse in waves 2-5.
+
+### Fixed
+- **Secrets guard false positives** — no longer blocks heredoc/string content containing `.env`, no longer blocks reading its own source file. Narrowed `/secret/i` pattern to avoid matching plugin filenames.
+- **Schema tests** — updated config schema tests to use `schemaVersion: 2`.
+- **Hook tests** — updated to match actual v2 behavior (entry-check state injection, superpowers guard internalized blocking).
+
 ## [2.0.1] - 2026-03-21
 
 ### Fixed

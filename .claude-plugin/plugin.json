@@ -1,6 +1,6 @@
 {
   "name": "claude-sdlc",
-  "version": "2.0.1",
+  "version": "2.1.0",
   "description": "Full SDLC governance for Claude Code — orchestrator, agent teams, workflow engine",
   "author": {
     "name": "Plan2Skill",
@@ -11,6 +11,16 @@
   "repository": "https://github.com/plan2skill/plan2sdlc",
   "keywords": ["sdlc", "governance", "workflow", "agents", "orchestrator"],
   "skills": "./skills/",
+  "mcpServers": {
+    "sdlc-registry": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/mcp/registry/dist/server.js"],
+      "env": {
+        "REGISTRY_DB_PATH": "${CLAUDE_PLUGIN_DATA}/registry.sqlite",
+        "SDLC_PROJECT_DIR": "${CLAUDE_PROJECT_DIR}"
+      }
+    }
+  },
   "agents": [
     "./agents/orchestrator.md"
   ],

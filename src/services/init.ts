@@ -198,7 +198,14 @@ export async function generateConfig(
   });
   generated.push(statePath);
 
-  // 5. tech-debt.json (empty)
+  // 5. ledger.md (empty index) + ledger/ archive directory
+  const ledgerPath = join(sdlcDir, 'ledger.md');
+  const { writeFile: writeFileFs } = await import('node:fs/promises');
+  await writeFileFs(ledgerPath, `# Project Ledger\nLast release: — | Tasks completed: 0\n\n## Since Last Release\n\n## Key Decisions (active)\n\n## Release History\n`, 'utf-8');
+  generated.push(ledgerPath);
+  await ensureDir(join(sdlcDir, 'ledger'));
+
+  // 6. tech-debt.json (empty)
   const techDebtPath = join(sdlcDir, 'tech-debt.json');
   await writeJsonFile(techDebtPath, { schemaVersion: 1, items: [], metrics: { total: 0, open: 0, resolvedThisMonth: 0, trend: 'stable' } });
   generated.push(techDebtPath);
@@ -325,16 +332,6 @@ export async function generateDomainAgents(
   const projectName = basename(projectDir);
 
   for (const domain of domains) {
-    // Generate disallowedTools: block Edit/Write for ALL other domain paths
-    const otherDomainPaths = domains
-      .filter(d => d.name !== domain.name)
-      .map(d => `Edit(${d.path}/**), Write(${d.path}/**)`)
-      .join(', ');
-    // Also block .claude/ and .sdlc/ modifications
-    const disallowedPaths = otherDomainPaths
-      ? `${otherDomainPaths}, Edit(.claude/**), Write(.claude/**), Edit(.sdlc/**), Write(.sdlc/**)`
-      : 'Edit(.claude/**), Write(.claude/**), Edit(.sdlc/**), Write(.sdlc/**)';
-
     const variables: Record<string, string> = {
       domain: domain.name,
       path: domain.path,
@@ -346,7 +343,6 @@ export async function generateDomainAgents(
       coverage_command: `pnpm test:coverage`,
       e2e_framework: 'playwright',
       domain_description: domain.description,
-      disallowed_paths: disallowedPaths,
     };
 
     // Developer agent

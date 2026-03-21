@@ -66,11 +66,44 @@ S/M tasks: auto-merge if all checks pass (unless config overrides).
 - Run full test suite post-merge
 - If post-merge tests fail: revert merge, chain to POST_MORTEM
 
-### 5. Cleanup
+### 5. Update Ledger
+
+Append a completion entry to the `## Since Last Release` section of `.sdlc/ledger.md`:
+
+```markdown
+- {TASK-ID}: {title} [{complexity}, {domains}] — done {YYYY-MM-DD}
+```
+
+If the task introduced **key architectural decisions**, add them to the `## Key Decisions (active)` section:
+
+```markdown
+- {Domain}: {decision summary}
+```
+
+Rules for the ledger index:
+- **Max ~150 lines total** — this gets injected into every orchestrator session
+- One line per completed task — concise, scannable
+- Key decisions only for non-obvious choices that affect future work
+- If `## Since Last Release` grows beyond ~40 items, the orchestrator should suggest a RELEASE session
+- If no RELEASE flow exists yet, archive manually: move entries to `.sdlc/ledger/{YYYY-MM}.json` and reset the section
+
+If `.sdlc/ledger.md` doesn't exist, create it:
+
+```markdown
+# Project Ledger
+Last release: — | Tasks completed: 0
+
+## Since Last Release
+
+## Key Decisions (active)
+
+## Release History
+```
+
+### 6. Cleanup
 
 - Update backlog item status to 'done'
 - Delete worktrees (if used)
-- Write completion entry to `.sdlc/history/`
 
 ### 6. Cadence Check
 

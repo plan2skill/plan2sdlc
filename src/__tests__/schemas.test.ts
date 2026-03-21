@@ -325,7 +325,7 @@ describe('config.schema.json', () => {
 
   it('validates a valid config', () => {
     const valid = validate({
-      schemaVersion: 1,
+      schemaVersion: 2,
       project: {
         name: 'my-app',
         type: 'single-app',
@@ -375,7 +375,7 @@ describe('config.schema.json', () => {
 
   it('validates a minimal config', () => {
     const valid = validate({
-      schemaVersion: 1,
+      schemaVersion: 2,
       project: { name: 'test', type: 'auto' },
       workflow: { maxRetries: 3 },
       budget: { monthlyWarning: 50, monthlyHardCap: 100 },

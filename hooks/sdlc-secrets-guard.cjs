@@ -3,7 +3,7 @@
 
 /**
  * SDLC Secrets Guard — PreToolUse hook
- * Blocks read/write access to sensitive files (credentials, keys, secrets).
+ * Blocks read/write access to sensitive files (credentials, keys).
  */
 
 const TOOLS_WITH_FILE_PATH = ['Read', 'Edit', 'Write'];
@@ -23,7 +23,7 @@ const NEVER_READ_PATTERNS = [
   /(?:^|[\\/])\.env(?:\..+)?$/i,
   // credentials
   /(?:^|[\\/])credentials/i,
-  // secrets directory
+  // secrets directory (path component, not substring)
   /[\\/]secrets[\\/]/i,
   // key/cert files
   /\.pem$/i,
@@ -31,10 +31,10 @@ const NEVER_READ_PATTERNS = [
   /\.p12$/i,
   /\.pfx$/i,
   // service account / gcloud keys
-  /(?:^|[\\/])service-account[^\\\/]*\.json$/i,
-  /(?:^|[\\/])gcloud-key[^\\\/]*\.json$/i,
-  // files with "secret" in name
-  /secret/i,
+  /(?:^|[\\/])service-account[^\\/]*\.json$/i,
+  /(?:^|[\\/])gcloud-key[^\\/]*\.json$/i,
+  // files named secret(s).* (but not hook source files like *-guard.cjs)
+  /(?:^|[\\/])secrets?(?![-_]guard)\b[^\\/]*$/i,
   // SSH keys
   /(?:^|[\\/])id_rsa/i,
   /(?:^|[\\/])id_ed25519/i,
@@ -46,26 +46,28 @@ function isException(filePath) {
   // .env.example and .env.template are always OK
   if (/(?:^|[\\/])\.env\.example$/i.test(filePath)) return true;
   if (/(?:^|[\\/])\.env\.template$/i.test(filePath)) return true;
-  // docs about secrets are OK
+  // docs about security are OK
   if (/^docs[\\/\/]/i.test(normalized) || /[\\/\/]docs[\\/\/]/i.test(normalized)) {
+    return true;
+  }
+  // Plugin hook source files are always OK to read
+  if (/[\\/]hooks[\\/]sdlc-[a-z-]+\.cjs$/i.test(normalized)) {
     return true;
   }
   return false;
 }
 
-// Bash command patterns that could expose secrets.
-// NOTE: This is best-effort. Bash-based exfiltration cannot be fully prevented
-// since commands can be obfuscated, aliased, or piped in countless ways.
-const BASH_SECRET_FILE_PATTERNS = [
-  /\.env(?!\.\w*example)(?!\.\w*template)(?:\s|$|['"])/i,
-  /\.pem(?:\s|$|['"])/i,
-  /\.key(?:\s|$|['"])/i,
-  /credentials/i,
-  /secrets\//i,
-  /id_rsa/i,
-  /id_ed25519/i,
-  /service-account/i,
-  /gcloud-key/i,
+// Bash command patterns that could expose actual credential files.
+// Only match when a file-accessing command targets a sensitive path.
+const BASH_SECRET_FILE_COMMANDS = [
+  // Direct file reads of .env (not .env.example/.env.template, not inside heredoc/string content)
+  /(?:cat|less|more|head|tail|source|\.)\s+[^\n|;]*[\\/]?\.env(?!\.(?:example|template))\b/i,
+  // Copying/moving credential files
+  /(?:cp|mv|rm)\s+[^\n|;]*[\\/]?\.env(?!\.(?:example|template))\b/i,
+  // Direct reads of key/cert files
+  /(?:cat|less|more|head|tail)\s+[^\n|;]*\.(?:pem|p12|pfx)\b/i,
+  /(?:cat|less|more|head|tail)\s+[^\n|;]*[\\/]id_(?:rsa|ed25519)\b/i,
+  /(?:cat|less|more|head|tail)\s+[^\n|;]*[\\/]credentials\b/i,
 ];
 
 const BASH_ENV_EXPOSURE_PATTERNS = [
@@ -80,23 +82,8 @@ const BASH_ENV_EXPOSURE_PATTERNS = [
 function isBashCommandBlocked(command) {
   if (!command) return false;
 
-  // Check for exception patterns first — .env.example / .env.template are OK
-  if (/\.env\.example/i.test(command) && !BASH_SECRET_FILE_PATTERNS.some((p) => {
-    // Only match if there's a secret file pattern that isn't the exception
-    const withoutExceptions = command.replace(/\.env\.example/gi, '').replace(/\.env\.template/gi, '');
-    return p.test(withoutExceptions);
-  })) {
-    return false;
-  }
-  if (/\.env\.template/i.test(command) && !BASH_SECRET_FILE_PATTERNS.some((p) => {
-    const withoutExceptions = command.replace(/\.env\.example/gi, '').replace(/\.env\.template/gi, '');
-    return p.test(withoutExceptions);
-  })) {
-    return false;
-  }
-
-  // Check for secret file access patterns
-  for (const pattern of BASH_SECRET_FILE_PATTERNS) {
+  // Check for secret file access commands
+  for (const pattern of BASH_SECRET_FILE_COMMANDS) {
     if (pattern.test(command)) return true;
   }
 
@@ -154,7 +141,7 @@ function main() {
       if (isBashCommandBlocked(command)) {
         const result = JSON.stringify({
           decision: 'block',
-          reason: `SDLC secrets guard: Bash command may access secrets — ${command}`,
+          reason: `SDLC guard: Bash command may access credentials — ${command.slice(0, 100)}`,
         });
         process.stdout.write(result);
         process.exit(2);
@@ -180,7 +167,7 @@ function main() {
     if (isBlocked(filePath, toolName)) {
       const result = JSON.stringify({
         decision: 'block',
-        reason: `SDLC secrets guard: ${filePath} matches protected pattern`,
+        reason: `SDLC guard: ${filePath} matches protected pattern`,
       });
       process.stdout.write(result);
       process.exit(2);
